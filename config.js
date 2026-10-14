@@ -1,4 +1,4 @@
 /* Pega aquí la URL de la "Aplicación web" de Google Apps Script (termina en /exec) */
 window.APP_CONFIG = {
-  GAS_URL: 'PEGA_AQUI_LA_URL_DE_TU_APLICACION_WEB'
+  GAS_URL: 'https://script.google.com/macros/s/AKfycbz7TVzbwIisw24G5mtooZ_Ba7hNlCJnP_K4Y1A_qAIBXC_LKgVD0RohOACiPMAtoKvHCQ/exec'
 };
