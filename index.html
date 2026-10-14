@@ -18,6 +18,28 @@
 <meta name="apple-mobile-web-app-title" content="Mi Liguilla">
 <meta name="format-detection" content="telephone=no">
 <link rel="stylesheet" href="app.css">
+<script>
+/* Diagnóstico: si la app no arranca, muestra qué archivo falta */
+(function(){
+  var bad=[];
+  function esc(t){return String(t).replace(/[&<>]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];});}
+  window.addEventListener('error',function(e){
+    var t=e.target;
+    if(t&&(t.tagName==='SCRIPT'||t.tagName==='LINK')) bad.push('No se encuentra: '+(t.src||t.href));
+    else if(e.message) bad.push('Error: '+e.message);
+  },true);
+  var box=null;
+  setInterval(function(){
+    var booting=document.body&&document.body.classList.contains('booting');
+    if(booting&&!box&&performance.now()>9000){
+      box=document.createElement('div');
+      box.style.cssText='position:fixed;inset:0;z-index:99999;background:#fff;color:#111;padding:22px;font:16px/1.5 sans-serif;overflow:auto';
+      box.innerHTML='<h2>La app no ha podido arrancar</h2><p>'+(bad.length?'<code>'+bad.map(esc).join('<br>')+'</code><br><br>Sube a GitHub los archivos que faltan (app.css, app.js, core.js, config.js, main.js, admin.js) en la misma carpeta que esta página.':'El servidor no responde. Revisa la URL en config.js y que la implementación del script sea "Cualquier usuario".')+'</p>';
+      document.body.appendChild(box);
+    }else if(!booting&&box){box.remove();box=null;}
+  },1000);
+})();
+</script>
 </head>
 <body class="booting">
 

@@ -1086,6 +1086,43 @@ function renderSubscription(first){
   }
 }
 
+/* ---------- Cambiar contraseña ---------- */
+function openChangePassword(){
+  document.getElementById('modal-title').textContent = '🔑 Cambiar contraseña';
+  document.getElementById('modal-body').innerHTML = `
+    <form onsubmit="event.preventDefault(); submitChangePassword();">
+      <label for="pw-cur">Contraseña actual</label>
+      <input type="password" id="pw-cur" autocomplete="current-password" required>
+      <label for="pw-new">Nueva contraseña (mínimo 6 caracteres)</label>
+      <input type="password" id="pw-new" autocomplete="new-password" minlength="6" required>
+      <label for="pw-rep">Repite la nueva contraseña</label>
+      <input type="password" id="pw-rep" autocomplete="new-password" minlength="6" required>
+      <div id="pw-msg" class="hint" style="color:var(--loss);"></div>
+      <div class="form-actions">
+        <button class="btn primary" type="submit" id="pw-save">💾 Guardar</button>
+        <button class="btn ghost" type="button" onclick="closeModal()">Cancelar</button>
+      </div>
+    </form>`;
+  document.getElementById('modal-bg').classList.add('open');
+}
+async function submitChangePassword(){
+  const cur = document.getElementById('pw-cur').value;
+  const nw = document.getElementById('pw-new').value;
+  const rep = document.getElementById('pw-rep').value;
+  const msg = document.getElementById('pw-msg'), btn = document.getElementById('pw-save');
+  if(nw.length < 6){ msg.textContent = 'La nueva contraseña debe tener al menos 6 caracteres.'; return; }
+  if(nw !== rep){ msg.textContent = 'Las dos contraseñas nuevas no coinciden.'; return; }
+  btn.disabled = true; msg.textContent = '';
+  try{
+    const d = await api('me/password', {method:'POST', body:{current: cur, password: nw}});
+    window.Core.setToken(d.token);
+    closeModal();
+    showSyncIndicator('✅ Contraseña cambiada');
+  }catch(err){
+    msg.textContent = err.message;
+  }finally{ btn.disabled = false; }
+}
+
 /* ---------- AJUSTES ---------- */
 let draft = null;
 function normUrl(u){
@@ -1115,6 +1152,7 @@ function accountCardHTML(){
     <p class="hint">${until}${a.hasPendingClaim ? ' · ⏳ pago pendiente de confirmar' : ''}</p>
     <div class="row-actions">
       ${a.status !== 'admin' ? '<button class="btn primary small" onclick="openPaywall()">⭐ Suscripción</button>' : '<a class="btn court small" href="admin.html">🛠️ Panel admin</a>'}
+      <button class="btn ghost small" onclick="openChangePassword()">🔑 Cambiar contraseña</button>
       <button class="btn ghost small" onclick="window.Auth.logout()">🚪 Cerrar sesión</button>
     </div>
   </div>`;
