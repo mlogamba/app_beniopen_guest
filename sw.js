@@ -1,6 +1,6 @@
 // Service worker: red primero (datos siempre frescos), caché solo como respaldo sin conexión
-const CACHE_NAME = 'miliguilla-v1';
-const SHELL = ['/', '/app.js', '/app.css', '/manifest.json', '/icon-192.png', '/icon-512.png'];
+const CACHE_NAME = 'miliguilla-v2';
+const SHELL = ['./', './index.html', './app.js', './app.css', './manifest.json', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', event => {
   event.waitUntil(
@@ -21,8 +21,6 @@ self.addEventListener('fetch', event => {
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
-  // API, cuentas y panel de administración: siempre de la red
-  if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/.netlify/') || url.pathname.startsWith('/admin')) return;
 
   event.respondWith(
     fetch(req)
@@ -33,6 +31,6 @@ self.addEventListener('fetch', event => {
         }
         return res;
       })
-      .catch(() => caches.match(req).then(r => r || caches.match('/')))
+      .catch(() => caches.match(req).then(r => r || caches.match('./')))
   );
 });
