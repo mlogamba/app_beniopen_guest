@@ -6,10 +6,10 @@
 <title>Mi Liguilla · Tu liguilla de tenis en el móvil</title>
 <meta name="description" content="Organiza tus partidos de liguilla: rivales, jornadas, resultados, invitaciones por WhatsApp y clasificación oficial dentro de la app.">
 
-<link rel="manifest" href="/manifest.json">
-<link rel="icon" type="image/png" sizes="48x48" href="/favicon-48.png">
-<link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
-<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="48x48" href="favicon-48.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
 
 <meta name="theme-color" content="#0f5a4d">
 <meta name="mobile-web-app-capable" content="yes">
@@ -17,55 +17,14 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Mi Liguilla">
 <meta name="format-detection" content="telephone=no">
-<link rel="stylesheet" href="/app.css">
-  <script type="module" crossorigin src="/assets/main-BNCE6Hwr.js"></script>
-  <link rel="modulepreload" crossorigin href="/assets/main-BTBcpQ3d.js">
+<link rel="stylesheet" href="app.css">
 </head>
-<body class="booting">
+<body class="signed-in">
 
 <div class="sync-indicator" id="sync-indicator">Sincronizando…</div>
 
 <!-- Botón de donación: visible en todas las pantallas -->
 <button type="button" class="donate-fab" onclick="donate()" aria-label="Haz una donación al creador de la app">💛 <span>Donar</span></button>
-
-<!-- ACCESO -->
-<div id="auth-screen" class="auth-screen">
-  <div class="auth-hero">
-    <div class="ball big" aria-hidden="true"></div>
-    <h1>Mi Liguilla</h1>
-    <p>Tu liguilla de tenis en el bolsillo: rivales, jornadas, resultados y clasificación, todo en una app.</p>
-  </div>
-  <div class="auth-card" id="auth-card">
-    <div class="auth-tabs" role="tablist">
-      <button type="button" class="auth-tab active" data-mode="login" onclick="Auth.mode('login')">Entrar</button>
-      <button type="button" class="auth-tab" data-mode="signup" onclick="Auth.mode('signup')">Crear cuenta</button>
-    </div>
-    <form id="auth-form" onsubmit="event.preventDefault(); Auth.submit();">
-      <div id="f-name-wrap" style="display:none;">
-        <label for="f-name">Tu nombre</label>
-        <input type="text" id="f-name" autocomplete="name" placeholder="Nombre y apellido">
-      </div>
-      <label for="f-email">Email</label>
-      <input type="email" id="f-email" autocomplete="email" required placeholder="tu@email.com">
-      <div id="f-pass-wrap">
-        <label for="f-pass">Contraseña</label>
-        <input type="password" id="f-pass" autocomplete="current-password" minlength="6" placeholder="Mínimo 6 caracteres">
-      </div>
-      <div id="auth-msg" class="auth-msg" role="status"></div>
-      <div class="form-actions">
-        <button type="submit" class="btn primary" id="auth-submit">Entrar</button>
-      </div>
-      <p class="hint center"><a href="#" id="auth-forgot" onclick="event.preventDefault(); Auth.mode('recover')">¿Has olvidado la contraseña?</a></p>
-    </form>
-    <p class="hint center" id="trial-note"></p>
-  </div>
-  <ul class="auth-features">
-    <li>📆 Calendario de jornadas con fechas y pistas</li>
-    <li>📱 Invitaciones y resultados por WhatsApp y email</li>
-    <li>📊 Clasificación y resultados oficiales sin salir de la app</li>
-    <li>☁️ Tus datos sincronizados en todos tus dispositivos</li>
-  </ul>
-</div>
 
 <!-- APP -->
 <div id="app-shell" class="app-shell">
@@ -98,8 +57,7 @@
     </div>
     <p class="hint" id="points-hint" style="padding:0 6px 8px;"></p>
     <div class="card">
-      <div class="hint" id="sync-status" style="margin:0 0 10px;">☁️ Sincronización: iniciando…</div>
-      <button type="button" class="btn ghost small" onclick="forceSync()" style="width:100%;">☁️ Sincronizar ahora</button>
+      <div class="hint" style="margin:0;">💾 Tus datos se guardan en este dispositivo. Haz una copia de seguridad desde ⚙️ Ajustes.</div>
     </div>
   </section>
 
@@ -216,20 +174,9 @@
   </div>
 </div>
 
-<!-- BLOQUEO: cuenta vencida o desactivada -->
-<div class="lock-screen" id="lock-screen">
-  <div class="lock-card">
-    <div class="ball big" aria-hidden="true"></div>
-    <div id="lock-body"></div>
-    <div class="form-actions">
-      <button class="btn ghost" onclick="window.Auth.logout()">🚪 Cerrar sesión</button>
-    </div>
-  </div>
-</div>
 </div>
 
-<div class="boot-splash" id="boot-splash"><div class="ball big" aria-hidden="true"></div></div>
-
-<script src="/app.js"></script>
+<script src="app.js"></script>
+<script>window.bootApp();</script>
 </body>
 </html>
