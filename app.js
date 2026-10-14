@@ -899,17 +899,15 @@ function generarInvitacion(){
     + `<button class="btn ghost" onclick="copyText(window._invText, this)" style="flex:1 1 100%;">📋 Copiar mensaje</button>`;
 }
 
-/* ---------- API y sincronización (Netlify Database) ---------- */
+/* ---------- Almacenamiento local (sin servidor) ---------- */
+const CFG_KEY = 'liguilla_config';
 async function api(path, opts){
   opts = opts || {};
-  const headers = {'Content-Type':'application/json'};
-  const token = window.Auth && await window.Auth.token();
-  if(token) headers.Authorization = 'Bearer ' + token;
-  const r = await fetch('/api/' + path, {method: opts.method || 'GET', headers, credentials:'same-origin',
-    body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined});
-  const data = await r.json().catch(()=>({}));
-  if(!r.ok){ const e = new Error(data.error || ('Error ' + r.status)); e.status = r.status; throw e; }
-  return data;
+  if(path === 'me/config' && opts.method === 'PUT'){
+    try{ localStorage.setItem(CFG_KEY, JSON.stringify(opts.body.value)); }
+    catch(e){ throw new Error('no se pudo guardar en este dispositivo'); }
+  }
+  return {};
 }
 
 function hhmm(){ return new Date().toLocaleTimeString('es-ES', {hour:'2-digit', minute:'2-digit', second:'2-digit'}); }
@@ -926,6 +924,7 @@ function forceSync(){
 
 let saveTimer = null, isSaving = false, saveAgain = false, isSyncing = false;
 function salvaDatiCloud(){
+  return; // sin servidor: los datos se guardan solo en este dispositivo
   if(!ME_ACC) return;
   clearTimeout(saveTimer);
   saveTimer = setTimeout(pushStore, 700);
@@ -974,6 +973,7 @@ function applyRemote(me, first){
 }
 
 function loadRemote(force){
+  return; // sin servidor
   if(isSyncing || (isSaving && !force)) return;
   isSyncing = true;
   api('me')
@@ -1111,6 +1111,7 @@ function renderAjustes(){
 }
 
 function accountCardHTML(){
+  return '';
   if(!ME_ACC) return '';
   const a = ME_ACC;
   const label = {admin:'Administrador', trial:'Prueba gratuita', paid:'Suscripción activa', due:'Pendiente de pago', blocked:'Bloqueada', disabled:'Desactivada'}[a.status] || a.status;
@@ -1420,29 +1421,18 @@ function importLegacy(){
 /* ---------- PWA: service worker ---------- */
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', function() {
-    navigator.serviceWorker.register('/sw.js').catch(function(error){ console.warn('Service Worker no registrado:', error); });
+    navigator.serviceWorker.register('./sw.js').catch(function(error){ console.warn('Service Worker no registrado:', error); });
   });
 }
 
-/* ---------- Arranque (lo llama src/main.js tras iniciar sesión) ---------- */
-window.bootApp = function(me){
-  lsKey = 'liguilla_data_' + me.account.id;
+/* ---------- Arranque (sin cuentas ni servidor: todo se guarda en este dispositivo) ---------- */
+window.bootApp = function(){
+  lsKey = 'liguilla_data';
   try{ const raw = localStorage.getItem(lsKey); if(raw) store = JSON.parse(raw); }catch(e){}
   store = normalizeStore(store);
-  applyConfig(me.config);
-  applyRemote(me, true);
-  setSyncStatus(true, 'conectado a las ' + hhmm());
-
-  if(/[?&]pago=ok/.test(location.search)){
-    history.replaceState(null, '', location.pathname);
-    if(!ME_ACC.hasPendingClaim && ME_ACC.status !== 'admin') claimPaid(true);
-  }
+  let cfg = null;
+  try{ cfg = JSON.parse(localStorage.getItem(CFG_KEY) || 'null'); }catch(e){}
+  applyConfig(cfg);
+  refreshAll();
   if(!isConfigured()) showView('ajustes');
-
-  let syncTimer = setInterval(()=>loadRemote(false), 30000);
-  document.addEventListener('visibilitychange', function(){
-    clearInterval(syncTimer);
-    if(!document.hidden){ loadRemote(false); syncTimer = setInterval(()=>loadRemote(false), 30000); }
-  });
-  window.addEventListener('online', ()=>loadRemote(false));
 };
