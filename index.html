@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>Mi Liguilla · Tu liguilla de tenis en el móvil</title>
+<meta name="description" content="Organiza tus partidos de liguilla: rivales, jornadas, resultados, invitaciones por WhatsApp y clasificación oficial dentro de la app.">
+
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" type="image/png" sizes="48x48" href="/favicon-48.png">
+<link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+
+<meta name="theme-color" content="#0f5a4d">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Mi Liguilla">
+<meta name="format-detection" content="telephone=no">
+<link rel="stylesheet" href="/app.css">
+  <script type="module" crossorigin src="/assets/main-BNCE6Hwr.js"></script>
+  <link rel="modulepreload" crossorigin href="/assets/main-BTBcpQ3d.js">
+</head>
+<body class="booting">
+
+<div class="sync-indicator" id="sync-indicator">Sincronizando…</div>
+
+<!-- Botón de donación: visible en todas las pantallas -->
+<button type="button" class="donate-fab" onclick="donate()" aria-label="Haz una donación al creador de la app">💛 <span>Donar</span></button>
+
+<!-- ACCESO -->
+<div id="auth-screen" class="auth-screen">
+  <div class="auth-hero">
+    <div class="ball big" aria-hidden="true"></div>
+    <h1>Mi Liguilla</h1>
+    <p>Tu liguilla de tenis en el bolsillo: rivales, jornadas, resultados y clasificación, todo en una app.</p>
+  </div>
+  <div class="auth-card" id="auth-card">
+    <div class="auth-tabs" role="tablist">
+      <button type="button" class="auth-tab active" data-mode="login" onclick="Auth.mode('login')">Entrar</button>
+      <button type="button" class="auth-tab" data-mode="signup" onclick="Auth.mode('signup')">Crear cuenta</button>
+    </div>
+    <form id="auth-form" onsubmit="event.preventDefault(); Auth.submit();">
+      <div id="f-name-wrap" style="display:none;">
+        <label for="f-name">Tu nombre</label>
+        <input type="text" id="f-name" autocomplete="name" placeholder="Nombre y apellido">
+      </div>
+      <label for="f-email">Email</label>
+      <input type="email" id="f-email" autocomplete="email" required placeholder="tu@email.com">
+      <div id="f-pass-wrap">
+        <label for="f-pass">Contraseña</label>
+        <input type="password" id="f-pass" autocomplete="current-password" minlength="6" placeholder="Mínimo 6 caracteres">
+      </div>
+      <div id="auth-msg" class="auth-msg" role="status"></div>
+      <div class="form-actions">
+        <button type="submit" class="btn primary" id="auth-submit">Entrar</button>
+      </div>
+      <p class="hint center"><a href="#" id="auth-forgot" onclick="event.preventDefault(); Auth.mode('recover')">¿Has olvidado la contraseña?</a></p>
+    </form>
+    <p class="hint center" id="trial-note"></p>
+  </div>
+  <ul class="auth-features">
+    <li>📆 Calendario de jornadas con fechas y pistas</li>
+    <li>📱 Invitaciones y resultados por WhatsApp y email</li>
+    <li>📊 Clasificación y resultados oficiales sin salir de la app</li>
+    <li>☁️ Tus datos sincronizados en todos tus dispositivos</li>
+  </ul>
+</div>
+
+<!-- APP -->
+<div id="app-shell" class="app-shell">
+<header class="top">
+  <div class="ball" aria-hidden="true"></div>
+  <div class="head-text">
+    <h1 id="hdr-title">Mi Liguilla</h1>
+    <p id="hdr-sub"></p>
+  </div>
+  <button type="button" class="hdr-btn" onclick="showView('ajustes')" aria-label="Ajustes">⚙️</button>
+</header>
+
+<main>
+  <div id="sub-banner"></div>
+
+  <!-- INICIO -->
+  <section id="view-inicio" class="view active">
+    <div class="score-card">
+      <div class="st"><b id="st-points">0</b><span>Puntos</span></div>
+      <div class="st"><b id="st-played">0/11</b><span>Jugados</span></div>
+      <div class="st"><b id="st-wins">0</b><span>Victorias</span></div>
+    </div>
+    <div id="setup-wrap"></div>
+    <div id="next-wrap"></div>
+    <div class="card" id="home-played"></div>
+    <div class="card" id="home-sched"></div>
+    <div class="row-actions" style="margin-bottom:12px;">
+      <button type="button" class="btn court" onclick="openLinkModal('clasificacion')">📊 Clasificación</button>
+      <button type="button" class="btn court" onclick="openLinkModal('resultados')">🏁 Resultados</button>
+    </div>
+    <p class="hint" id="points-hint" style="padding:0 6px 8px;"></p>
+    <div class="card">
+      <div class="hint" id="sync-status" style="margin:0 0 10px;">☁️ Sincronización: iniciando…</div>
+      <button type="button" class="btn ghost small" onclick="forceSync()" style="width:100%;">☁️ Sincronizar ahora</button>
+    </div>
+  </section>
+
+  <!-- CALENDARIO -->
+  <section id="view-calendario" class="view">
+    <div id="cal-list"></div>
+  </section>
+
+  <!-- PARTIDAS -->
+  <section id="view-partidas" class="view">
+    <div id="matches-list"></div>
+  </section>
+
+  <!-- INVITAR -->
+  <section id="view-invitar" class="view">
+    <div class="card">
+      <h3>Proponer partido</h3>
+      <label>Rival</label>
+      <select id="inv-opp"></select>
+      <label>Fecha propuesta</label>
+      <input type="date" id="inv-date">
+      <label>Hora propuesta</label>
+      <div class="time-picker">
+        <button type="button" class="time-step" onclick="stepTime('inv-time',-15)" aria-label="Menos 15 minutos">−</button>
+        <input type="time" class="time-input" id="inv-time" value="18:00" step="300">
+        <button type="button" class="time-step" onclick="stepTime('inv-time',15)" aria-label="Más 15 minutos">+</button>
+      </div>
+      <div class="time-chips" id="inv-time-chips"></div>
+      <label>Pista / club</label>
+      <div class="campo-field">
+        <select id="inv-campo" class="campo-select" onchange="handleCampoChange('inv-campo')"></select>
+        <button type="button" class="btn ghost small" onclick="showView('pista')">⚙️ Pistas</button>
+      </div>
+      <div id="inv-campo-custom-wrap" class="custom-court-box" style="display:none;">
+        <input type="text" id="inv-campo-newname" placeholder="Nombre de la pista">
+        <input type="text" id="inv-campo-newaddr" placeholder="Dirección / referencia de Google Maps (opcional)">
+        <button type="button" class="btn primary small" onclick="addCourtInline('inv-campo')" style="width:100%;">➕ Añadir y usar esta pista</button>
+      </div>
+      <div class="form-actions">
+        <button class="btn primary" onclick="generarInvitacion()">Generar mensaje</button>
+      </div>
+      <div id="inv-msgbox"></div>
+      <div id="inv-send" class="row-actions free"></div>
+    </div>
+  </section>
+
+  <!-- AJUSTES -->
+  <section id="view-ajustes" class="view">
+    <div id="ajustes-body"></div>
+  </section>
+
+  <!-- PISTA -->
+  <section id="view-pista" class="view">
+    <div class="card">
+      <h3>Reserva de pistas de tenis</h3>
+      <p class="hint" style="margin:4px 0 4px;">
+        Toca una instalación para abrir su reserva online en una nueva pestaña.
+      </p>
+
+      <div class="row-actions" id="booking-list" style="grid-template-columns:1fr;"></div>
+    </div>
+
+    <div class="card">
+      <h3>Mis pistas guardadas</h3>
+      <p class="hint" style="margin:4px 0 12px;">
+        Estas pistas aparecen en el desplegable al programar un partido o crear una invitación.
+        Corrige la dirección de cada una (para que "Ver en Maps" lleve al sitio exacto) o añade nuevas.
+      </p>
+      <div id="courts-manager"></div>
+      <div class="divider"></div>
+      <label>Nueva pista</label>
+      <input type="text" id="new-court-name" placeholder="Nombre de la pista">
+      <label>Dirección / referencia de Google Maps</label>
+      <input type="text" id="new-court-addr" placeholder="Ej: FHHP+P6, Mislata, València">
+      <label>Enlace de reserva online (opcional)</label>
+      <input type="url" id="new-court-url" placeholder="https://…">
+      <div class="form-actions">
+        <button class="btn primary" onclick="addCourtFromManager()">➕ Añadir pista</button>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<nav class="tabs">
+  <button class="tab active" data-view="inicio" onclick="showView('inicio')"><span class="ic">🏠</span>Inicio</button>
+  <button class="tab" data-view="calendario" onclick="showView('calendario')"><span class="ic">📆</span>Calendario</button>
+  <button class="tab" data-view="partidas" onclick="showView('partidas')"><span class="ic">📋</span>Partidas</button>
+  <button class="tab" data-view="invitar" onclick="showView('invitar')"><span class="ic">✉️</span>Invitar</button>
+  <button class="tab" data-view="pista" onclick="showView('pista')"><span class="ic">🏟️</span>Pista</button>
+</nav>
+
+<!-- MODAL: programar / registrar / nota privada / suscripción -->
+<div class="modal-bg" id="modal-bg">
+  <div class="modal">
+    <div class="mh">
+      <h3 id="modal-title">Partido</h3>
+      <button class="close-x" onclick="closeModal()" aria-label="Cerrar">✕</button>
+    </div>
+    <div id="modal-body"></div>
+  </div>
+</div>
+
+<!-- VISOR: clasificación y resultados dentro de la app -->
+<div class="frame-bg" id="frame-bg">
+  <div class="frame-sheet">
+    <div class="frame-head">
+      <button class="close-x" onclick="closeFrame()" aria-label="Cerrar">‹</button>
+      <h3 id="frame-title"></h3>
+      <button class="btn ghost small" onclick="reloadFrame()" aria-label="Recargar">🔄</button>
+      <a class="btn ghost small" id="frame-out" href="#" target="_blank" rel="noopener">↗ Abrir fuera</a>
+    </div>
+    <div class="frame-body" id="frame-body"></div>
+  </div>
+</div>
+
+<!-- BLOQUEO: cuenta vencida o desactivada -->
+<div class="lock-screen" id="lock-screen">
+  <div class="lock-card">
+    <div class="ball big" aria-hidden="true"></div>
+    <div id="lock-body"></div>
+    <div class="form-actions">
+      <button class="btn ghost" onclick="window.Auth.logout()">🚪 Cerrar sesión</button>
+    </div>
+  </div>
+</div>
+</div>
+
+<div class="boot-splash" id="boot-splash"><div class="ball big" aria-hidden="true"></div></div>
+
+<script src="/app.js"></script>
+</body>
+</html>

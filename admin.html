@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Amministrazione · Mi Liguilla</title>
+<meta name="robots" content="noindex">
+<link rel="icon" type="image/png" sizes="48x48" href="/favicon-48.png">
+<meta name="theme-color" content="#0a3f36">
+<link rel="stylesheet" href="/app.css">
+<style>body{padding-bottom:90px}.adm{max-width:1180px;margin:0 auto;padding:16px 14px 40px}header.top{border-radius:0 0 22px 22px}header.top .hdr-actions{gap:8px;margin-left:auto;display:flex;position:relative}header.top .hdr-actions .btn{min-height:40px;padding:8px 12px;font-size:14px}.btn.light{color:#fff;background:#ffffff1f;border:1.5px solid #ffffff40}.kpis{grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px;display:grid}.kpi{background:var(--surface);border:1px solid var(--line);box-shadow:var(--shadow);border-radius:16px;padding:14px}.kpi span{color:var(--muted);font-size:13px;font-weight:700;display:block}.kpi b{font-variant-numeric:tabular-nums;color:var(--ink);margin-top:4px;font-size:28px;font-weight:800;display:block}.kpi.accent{background:var(--court-dark);border-color:var(--court-dark)}.kpi.accent span{color:#ffffffbf}.kpi.accent b{color:var(--ball)}.sec-head{flex-wrap:wrap;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px;display:flex}.sec-head h3{margin:0}.toolbar{flex-wrap:wrap;align-items:center;gap:8px;display:flex}.toolbar input,.toolbar select{width:auto;min-height:42px;padding:8px 12px}.toolbar .btn{min-height:42px;padding:8px 12px;font-size:14px}.tbl-wrap{-webkit-overflow-scrolling:touch;margin:0 -4px;overflow-x:auto}table.tbl{border-collapse:collapse;width:100%;min-width:720px;font-size:14.5px}.tbl th{text-align:left;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);border-bottom:1.5px solid var(--line);white-space:nowrap;padding:8px;font-size:12.5px}.tbl td{border-bottom:1px solid var(--line);vertical-align:middle;padding:10px 8px}.tbl td.num,.tbl th.num{text-align:right;font-variant-numeric:tabular-nums}.tbl tr.clickable{cursor:pointer}.tbl tr.clickable:hover{background:var(--surface-2)}.who b{display:block}.who small{color:var(--muted)}.switch{flex:none;width:46px;height:26px;display:inline-block;position:relative}.switch input{opacity:0;width:0;height:0}.switch span{background:var(--line);cursor:pointer;border-radius:99px;transition:all .2s;position:absolute;inset:0}.switch span:before{content:"";background:#fff;border-radius:50%;width:20px;height:20px;transition:all .2s;position:absolute;top:3px;left:3px;box-shadow:0 1px 3px #00000040}.switch input:checked+span{background:var(--win)}.switch input:checked+span:before{transform:translate(20px)}.mini{border-radius:10px!important;min-height:34px!important;padding:6px 10px!important;font-size:13.5px!important}.claim{border-bottom:1px solid var(--line);flex-wrap:wrap;justify-content:space-between;align-items:center;gap:10px;padding:10px 0;display:flex}.claim:last-child{border-bottom:0}.settings-grid{grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:0 14px;display:grid}.month-bars{gap:6px;margin-top:6px;display:grid}.mbar{grid-template-columns:90px 1fr 80px;align-items:center;gap:10px;font-size:14px;display:grid}.mbar .track{background:var(--surface-2);border-radius:99px;height:12px;overflow:hidden}.mbar .fill{background:var(--court);border-radius:99px;height:100%}.mbar .v{text-align:right;font-variant-numeric:tabular-nums;font-weight:800}.gate{max-width:420px;margin:40px auto}.muted{color:var(--muted)}@media (width<=699px){.hide-sm{display:none}}</style>
+  <script type="module" crossorigin src="/assets/admin-Pf5V1Msv.js"></script>
+  <link rel="modulepreload" crossorigin href="/assets/main-BTBcpQ3d.js">
+</head>
+<body class="booting">
+
+<button type="button" class="donate-fab" onclick="window.open(window.DONATION_URL || 'https://www.paypal.com/pool/9tjbXNXSNs?sr=wccr','_blank','noopener')" style="bottom:calc(18px + env(safe-area-inset-bottom,0px));">💛 <span>Donar</span></button>
+
+<header class="top">
+  <div class="ball" aria-hidden="true"></div>
+  <div class="head-text">
+    <h1>Pannello amministratore</h1>
+    <p id="adm-sub">Mi Liguilla · account, abbonamenti e contabilità</p>
+  </div>
+  <div class="hdr-actions">
+    <a class="btn light" href="/">🎾 App</a>
+    <button class="btn light" id="btn-logout" style="display:none;">Esci</button>
+  </div>
+</header>
+
+<div class="adm">
+  <!-- Accesso -->
+  <div id="gate" class="gate card" style="display:none;">
+    <h3>Accesso amministratore</h3>
+    <p class="hint" id="gate-msg">Entra con l'email dell'amministratore.</p>
+    <form id="gate-form">
+      <label for="g-email">Email</label>
+      <input type="email" id="g-email" autocomplete="email" required>
+      <label for="g-pass">Password</label>
+      <input type="password" id="g-pass" autocomplete="current-password" required>
+      <div class="form-actions"><button class="btn primary" type="submit">Entra</button></div>
+    </form>
+  </div>
+
+  <div id="dash" style="display:none;">
+    <div class="kpis" id="kpis"></div>
+
+    <div class="card" id="claims-card" style="display:none;">
+      <div class="sec-head"><h3>🔔 Avvisi di pagamento da confermare</h3></div>
+      <p class="hint" style="margin-top:0;">Controlla su PayPal che il pagamento sia arrivato, poi conferma: l'abbonamento si estende automaticamente.</p>
+      <div id="claims"></div>
+    </div>
+
+    <div class="card">
+      <div class="sec-head">
+        <h3>👥 Account <span class="count" id="acc-count"></span></h3>
+        <div class="toolbar">
+          <input type="search" id="acc-q" placeholder="Cerca nome o email…">
+          <select id="acc-f">
+            <option value="">Tutti gli stati</option>
+            <option value="trial">In prova</option>
+            <option value="paid">Pagato</option>
+            <option value="due">Scaduto (in tolleranza)</option>
+            <option value="blocked">Bloccato</option>
+            <option value="disabled">Disattivato</option>
+          </select>
+          <button class="btn ghost" id="bulk-on">✅ Attiva tutti</button>
+          <button class="btn ghost danger" id="bulk-off">⛔ Disattiva tutti</button>
+        </div>
+      </div>
+      <div class="tbl-wrap"><table class="tbl" id="acc-tbl"></table></div>
+    </div>
+
+    <div class="card">
+      <div class="sec-head">
+        <h3>📒 Contabilità</h3>
+        <div class="toolbar">
+          <select id="pay-year"></select>
+          <button class="btn primary" id="pay-new">➕ Registra pagamento</button>
+          <button class="btn ghost" id="pay-csv">⬇️ Esporta CSV</button>
+        </div>
+      </div>
+      <div class="month-bars" id="month-bars"></div>
+      <div class="divider"></div>
+      <div class="tbl-wrap"><table class="tbl" id="pay-tbl"></table></div>
+    </div>
+
+    <div class="card">
+      <div class="sec-head"><h3>⚙️ Impostazioni</h3></div>
+      <form id="set-form">
+        <div class="settings-grid">
+          <div><label for="s-trial">Giorni di prova gratuita (nuovi account)</label><input type="number" id="s-trial" min="0"></div>
+          <div><label for="s-grace">Giorni di tolleranza dopo la scadenza</label><input type="number" id="s-grace" min="0"></div>
+          <div><label for="s-warn">Avviso X giorni prima della fine prova</label><input type="number" id="s-warn" min="0"></div>
+          <div><label for="s-price">Prezzo mensile</label><input type="number" id="s-price" min="0" step="0.01"></div>
+          <div><label for="s-cur">Valuta</label><input type="text" id="s-cur" maxlength="3"></div>
+          <div><label for="s-pp">Email PayPal che riceve i pagamenti</label><input type="email" id="s-pp"></div>
+        </div>
+        <label for="s-don">Link PayPal per le donazioni</label>
+        <input type="url" id="s-don">
+        <p class="hint">La prova gratuita vale per i nuovi account; per quelli esistenti modifica la data nella scheda dell'account.</p>
+        <div class="form-actions"><button class="btn primary" type="submit">💾 Salva impostazioni</button></div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="modal-bg">
+  <div class="modal">
+    <div class="mh"><h3 id="modal-title"></h3><button class="close-x" onclick="closeModal()" aria-label="Chiudi">✕</button></div>
+    <div id="modal-body"></div>
+  </div>
+</div>
+
+<div class="sync-indicator" id="sync-indicator"></div>
+<div class="boot-splash" id="boot-splash"><div class="ball big" aria-hidden="true"></div></div>
+
+</body>
+</html>
