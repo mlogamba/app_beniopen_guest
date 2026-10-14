@@ -1,6 +1,6 @@
 // Service worker: red primero (datos siempre frescos), caché solo como respaldo sin conexión
-const CACHE_NAME = 'miliguilla-v2';
-const SHELL = ['./', './index.html', './app.js', './app.css', './manifest.json', './icon-192.png', './icon-512.png'];
+const CACHE_NAME = 'miliguilla-v3';
+const SHELL = ['./', './index.html', './app.js', './app.css', './config.js', './core.js', './main.js', './manifest.json', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', event => {
   event.waitUntil(
@@ -21,6 +21,8 @@ self.addEventListener('fetch', event => {
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
+  // el panel de administración va siempre por la red
+  if (url.pathname.endsWith('/admin.html') || url.pathname.endsWith('/admin.js')) return;
 
   event.respondWith(
     fetch(req)

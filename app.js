@@ -899,15 +899,10 @@ function generarInvitacion(){
     + `<button class="btn ghost" onclick="copyText(window._invText, this)" style="flex:1 1 100%;">📋 Copiar mensaje</button>`;
 }
 
-/* ---------- Almacenamiento local (sin servidor) ---------- */
-const CFG_KEY = 'liguilla_config';
+/* ---------- API y sincronización (Google Apps Script) ---------- */
 async function api(path, opts){
   opts = opts || {};
-  if(path === 'me/config' && opts.method === 'PUT'){
-    try{ localStorage.setItem(CFG_KEY, JSON.stringify(opts.body.value)); }
-    catch(e){ throw new Error('no se pudo guardar en este dispositivo'); }
-  }
-  return {};
+  return window.Core.call(path, opts.method || 'GET', opts.body !== undefined ? opts.body : null);
 }
 
 function hhmm(){ return new Date().toLocaleTimeString('es-ES', {hour:'2-digit', minute:'2-digit', second:'2-digit'}); }
@@ -924,7 +919,6 @@ function forceSync(){
 
 let saveTimer = null, isSaving = false, saveAgain = false, isSyncing = false;
 function salvaDatiCloud(){
-  return; // sin servidor: los datos se guardan solo en este dispositivo
   if(!ME_ACC) return;
   clearTimeout(saveTimer);
   saveTimer = setTimeout(pushStore, 700);
@@ -973,7 +967,6 @@ function applyRemote(me, first){
 }
 
 function loadRemote(force){
-  return; // sin servidor
   if(isSyncing || (isSaving && !force)) return;
   isSyncing = true;
   api('me')
@@ -992,7 +985,7 @@ function money(n){ return (Number(n)||0).toLocaleString('es-ES', {style:'currenc
 function paypalPayLink(months){
   const s = APP_SETTINGS;
   const total = Math.round(months * (Number(s.monthlyPrice)||0) * 100) / 100;
-  const base = location.origin + '/';
+  const base = location.origin + location.pathname.replace(/[^/]*$/, '');
   return 'https://www.paypal.com/cgi-bin/webscr?cmd=_xclick'
     + '&business=' + encodeURIComponent(s.paypalEmail || '')
     + '&item_name=' + encodeURIComponent('Suscripción Mi Liguilla · ' + months + (months>1?' meses':' mes') + ' · ' + (ME_ACC ? ME_ACC.email : ''))
@@ -1111,7 +1104,6 @@ function renderAjustes(){
 }
 
 function accountCardHTML(){
-  return '';
   if(!ME_ACC) return '';
   const a = ME_ACC;
   const label = {admin:'Administrador', trial:'Prueba gratuita', paid:'Suscripción activa', due:'Pendiente de pago', blocked:'Bloqueada', disabled:'Desactivada'}[a.status] || a.status;
@@ -1122,7 +1114,7 @@ function accountCardHTML(){
     <div class="acc-line"><span>${escapeHtml(a.email)}</span><span class="pill ${cls}">${label}</span></div>
     <p class="hint">${until}${a.hasPendingClaim ? ' · ⏳ pago pendiente de confirmar' : ''}</p>
     <div class="row-actions">
-      ${a.status !== 'admin' ? '<button class="btn primary small" onclick="openPaywall()">⭐ Suscripción</button>' : '<a class="btn court small" href="/admin.html">🛠️ Panel admin</a>'}
+      ${a.status !== 'admin' ? '<button class="btn primary small" onclick="openPaywall()">⭐ Suscripción</button>' : '<a class="btn court small" href="admin.html">🛠️ Panel admin</a>'}
       <button class="btn ghost small" onclick="window.Auth.logout()">🚪 Cerrar sesión</button>
     </div>
   </div>`;
@@ -1425,14 +1417,25 @@ if ('serviceWorker' in navigator) {
   });
 }
 
-/* ---------- Arranque (sin cuentas ni servidor: todo se guarda en este dispositivo) ---------- */
-window.bootApp = function(){
-  lsKey = 'liguilla_data';
+/* ---------- Arranque (lo llama src/main.js tras iniciar sesión) ---------- */
+window.bootApp = function(me){
+  lsKey = 'liguilla_data_' + me.account.id;
   try{ const raw = localStorage.getItem(lsKey); if(raw) store = JSON.parse(raw); }catch(e){}
   store = normalizeStore(store);
-  let cfg = null;
-  try{ cfg = JSON.parse(localStorage.getItem(CFG_KEY) || 'null'); }catch(e){}
-  applyConfig(cfg);
-  refreshAll();
+  applyConfig(me.config);
+  applyRemote(me, true);
+  setSyncStatus(true, 'conectado a las ' + hhmm());
+
+  if(/[?&]pago=ok/.test(location.search)){
+    history.replaceState(null, '', location.pathname);
+    if(!ME_ACC.hasPendingClaim && ME_ACC.status !== 'admin') claimPaid(true);
+  }
   if(!isConfigured()) showView('ajustes');
+
+  let syncTimer = setInterval(()=>loadRemote(false), 60000);
+  document.addEventListener('visibilitychange', function(){
+    clearInterval(syncTimer);
+    if(!document.hidden){ loadRemote(false); syncTimer = setInterval(()=>loadRemote(false), 60000); }
+  });
+  window.addEventListener('online', ()=>loadRemote(false));
 };
