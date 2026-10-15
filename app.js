@@ -76,6 +76,25 @@ const DEFAULT_COURTS = [
   {id:"c_vtc",        name:"Valencia Tennis Center · Malvarrosa", address:"Valencia Tennis Center, Malvarrosa, València",  bookingUrl:"https://valenciateniscenter.matchpoint.com.es/"}
 ];
 
+/* Contactos pre-cargados del grupo Segunda B (del backup oficial) */
+const BO_SEGUNDA_B_CONTACTS = {
+  'amalio mota':        {phone:'676965274',       email:'amaliomota@hotmail.com'},
+  'tim f.':             {phone:'+34 624 55 99 32', email:'tim.fedeseev@gmail.com'},
+  'tim fedeseev':       {phone:'+34 624 55 99 32', email:'tim.fedeseev@gmail.com'},
+  'miguel arellano':    {phone:'651354393',        email:'miarellano7@gmail.com'},
+  'vale t.':            {phone:'+34 624 05 67 65', email:'vale.terra@gmail.com'},
+  'mauricio senabre':   {phone:'605899884',        email:'maurosenabre@gmail.com'},
+  'mauricio senebre':   {phone:'605899884',        email:'maurosenabre@gmail.com'},
+  'juan c. arias':      {phone:'655849981',        email:'jcap155@hotmail.com'},
+  'javier herrero':     {phone:'636762304',        email:'javencia@yahoo.es'},
+  'ramón andrés':       {phone:'625788400',        email:'midavido1966@gmail.com'},
+  'ramon andres':       {phone:'625788400',        email:'midavido1966@gmail.com'},
+  'raúl ruiz':          {phone:'+34626121666',     email:'rarugon80@hotmail.com'},
+  'raul ruiz':          {phone:'+34626121666',     email:'rarugon80@hotmail.com'},
+  'juan b. esteve':     {phone:'607284167',        email:'juanbautista.esteve@berner.es'},
+  'luis neira':         {phone:'652096096',        email:'infoluisneira@gmail.com'}
+};
+
 const BO_STATIC_DATA = {"edition":"37º Beniopen","updatedAt":1792085492432,"groups":[{"slug":"segunda-a","label":"Segunda A","url":"https://www.beniopen.es/table/segunda-a/","players":["José M. Lara","Julián Ramírez","Sergio Ros","Alex García","Juan González","Marcos Ortíz","Bradley Suter","Enrique Álvarez","Lifeng Ou","Manuel Bullón","Carlos Gutiérrez","Miguel Martínez"]},{"slug":"segunda-b","label":"Segunda B","url":"https://www.beniopen.es/table/segunda-b/","players":["Ramón Andrés","Juan C. Arias","Marcello Gambardella","Juan B. Esteve","Luis Neira","Tim F.","Amalio Mota","Mauricio Senabre","Javier Herrero","Miguel Arellano","Raúl Ruiz","Vale T."]},{"slug":"segunda-c","label":"Segunda C","url":"https://www.beniopen.es/table/segunda-c/","players":["Fernando Vegas","Raúl Ortega","Fernando Guillamón","Daniel Alonso S.","Pablo Carbo","Abel Fernández","Juan Gomis","Alejandro López","Andrés Martínez","Carlos Marquez","José L. Haro","Paco Ordaz"]},{"slug":"segunda-d","label":"Segunda D","url":"https://www.beniopen.es/table/segunda-d/","players":["Adrián García R.","Jesús Bosca","Olek B.","Dmytro A.","Ricardo García M.","Eduardo J. Gómez","Paco Morante","Gerardo Morante","Jorge López","Jesús Guerrero","Marco Catalán","Vicent Escutia"]},{"slug":"segunda-e","label":"Segunda E","url":"https://www.beniopen.es/table/segunda-e/","players":["Agustín I.","Nacho Sánchez","Claudio S.","Dani S.","Jesús Vergara","Pablo Wagner","Rodrigo B.","Álvaro Zancajo","Sebastián Sánchez","Rafa Soria","Raquel Salavert","Cheng Xu"]},{"slug":"segunda-f","label":"Segunda F","url":"https://www.beniopen.es/table/segunda-f/","players":["Vicente Balaguer","Fran Hernández","Juan Sánchez V.","Manuel Agudo","David Méndez","Andrea Romaguera","Andrés Valiente","Antonio Nieto","Israel Marín","Luis Sánchez G.","Nino Villanueva","Maya K."]}]};
 
 /* ---------- Storage ---------- */
@@ -1170,17 +1189,37 @@ function beniopenImport(){
 
   // conserva teléfono, email y ranking de los rivales que ya tenías
   const prev = {}; (CFG.opponents || []).forEach(o=>{ prev[o.name.toLowerCase()] = o; });
-  const opponents = others.map(n=>{ const p = prev[n.toLowerCase()] || {}; return {name:n, phone:p.phone||'', email:p.email||'', ranking:p.ranking||null}; });
+
+  // per el grupo segunda-b: pre-carga contactos desde los datos oficiales del backup
+  const isSegundaB = g.slug === 'segunda-b';
+  const opponents = others.map(n=>{
+    const p = prev[n.toLowerCase()] || {};
+    const bo = isSegundaB ? (BO_SEGUNDA_B_CONTACTS[n.toLowerCase()] || {}) : {};
+    return {
+      name:    n,
+      phone:   p.phone  || bo.phone  || '',
+      email:   p.email  || bo.email  || '',
+      ranking: p.ranking || null
+    };
+  });
   // conserva el orden de jornadas de los rivales que ya estaban y añade el resto
   const kept = (CFG.fixture || []).filter(f=>others.includes(f.opp)).map(f=>({opp:f.opp, from:f.from||'', to:f.to||''}));
   const used = new Set(kept.map(f=>f.opp));
   const fixture = kept.concat(others.filter(n=>!used.has(n)).map(n=>({opp:n, from:'', to:''})));
 
+  // org: default Beniopen si el usuario no tenía datos propios ya configurados
+  const orgPhone = (CFG.org && CFG.org.phone) || '34637207632';
+  const orgEmail = (CFG.org && CFG.org.email) || 'beniopen@yahoo.es';
+
+  // resultados: URL oficial Beniopen por defecto
+  const resultadosUrl = (CFG.links && CFG.links.resultados) || 'https://www.beniopen.es/ultimos-resultados/ultimos-resultados-segunda/';
+
   const clean = {
     playerName: me, myRanking: CFG.myRanking || null,
     tournament: BO_DATA.edition || CFG.tournament || '37º Beniopen', group: g.label,
-    pointsWin: CFG.pointsWin, pointsLoss: CFG.pointsLoss, org: CFG.org,
-    links: {clasificacion: g.url, resultados: (CFG.links && CFG.links.resultados) || ''},
+    pointsWin: CFG.pointsWin, pointsLoss: CFG.pointsLoss,
+    org: {phone: orgPhone, email: orgEmail},
+    links: {clasificacion: g.url, resultados: resultadosUrl},
     opponents, fixture, legacyGasUrl: CFG.legacyGasUrl || ''
   };
   store.matches = {};
