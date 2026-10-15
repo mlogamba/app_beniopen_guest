@@ -71,3 +71,62 @@ a(`btn-pass`).addEventListener(`click`,()=>{D(`Cambiar contraseña`,`<form id="p
 <div class="form-actions"><button class="btn primary" type="submit">💾 Guardar</button><button class="btn ghost" type="button" onclick="closeModal()">Annulla</button></div></form>`),a(`pw-form`).addEventListener(`submit`,async ev=>{ev.preventDefault();let nw=a(`pw-new`).value;if(nw.length<6){a(`pw-msg`).textContent=`La nueva contraseña debe tener al menos 6 caracteres.`;return}if(nw!==a(`pw-rep`).value){a(`pw-msg`).textContent=`Las dos contraseñas nuevas no coinciden.`;return}try{let d=await Core.call(`me/password`,`POST`,{current:a(`pw-cur`).value,password:nw});Core.setToken(d.token),closeModal(),m(`Contraseña cambiada`)}catch(err){a(`pw-msg`).textContent=err.message}})});
 a(`bo-refresh`).addEventListener(`click`,async()=>{let b=a(`bo-refresh`);b.disabled=!0;try{await g(`beniopen/refresh`,`POST`);m(`Giocatori Beniopen aggiornati`)}catch(err){alert(err.message)}b.disabled=!1});
 })();
+
+/* ====================================================================
+   ELIMINAR USUARIO — función añadida para el panel de administración
+   ==================================================================== */
+(function(){
+  /* Borra definitivamente la cuenta y sus datos de la nube */
+  window._adminDeleteUser = async function(accId, accName, accEmail){
+    if(!confirm('¿ELIMINAR la cuenta de ' + (accName || accEmail) + '?\n\nEsta acción es IRREVERSIBLE: se borran la cuenta, todos sus partidos y sus datos de la nube.')) return;
+    var second = prompt('Para confirmar, escribe el email del usuario:');
+    if(!second || second.trim().toLowerCase() !== (accEmail||'').trim().toLowerCase()){
+      alert('El email no coincide. Operación cancelada.'); return;
+    }
+    try{
+      await Core.call('admin/accounts/' + accId, 'DELETE', null);
+      closeModal();
+      location.reload();
+    }catch(err){
+      alert('Error al eliminar: ' + err.message);
+    }
+  };
+
+  /* Inyectar botón de eliminar en el modal de cuenta usando MutationObserver */
+  var modalBg = document.getElementById('modal-bg');
+  if(modalBg){
+    var observer = new MutationObserver(function(){
+      if(!modalBg.classList.contains('open')) return;
+      var form = modalBg.querySelector('#acc-form');
+      if(!form || form.dataset.delInjected) return;
+      form.dataset.delInjected = '1';
+      /* Leer el ID del account desde el botón a-pay que ya existe */
+      var payBtn = modalBg.querySelector('#a-pay');
+      if(!payBtn) return;
+      /* El ID lo guardamos en un atributo durante el patch de j() –
+         como j() está minificado lo leemos de la tabla (data-acc)
+         que fue clickada: lo almacenamos en el modal en un data attr */
+      var accId = modalBg.dataset.currentAccId;
+      var accName = (modalBg.querySelector('#a-name') || {}).value || '';
+      var accEmail = (modalBg.querySelector('.acc-line span') || {}).textContent || '';
+      if(!accId) return;
+      var delBtn = document.createElement('button');
+      delBtn.type = 'button';
+      delBtn.className = 'btn ghost danger';
+      delBtn.style.marginTop = '8px';
+      delBtn.textContent = '🗑️ Elimina utente';
+      delBtn.onclick = function(){ window._adminDeleteUser(+accId, accName, accEmail); };
+      var fa = form.querySelector('.form-actions');
+      if(fa) fa.appendChild(delBtn);
+    });
+    observer.observe(modalBg, {attributes:true, attributeFilter:['class'], subtree:false});
+  }
+
+  /* Patch del click listener sulle righe della tabella per salvare il currentAccId nel modal */
+  document.addEventListener('click', function(e){
+    var row = e.target.closest('tr[data-acc]');
+    if(row && modalBg){
+      modalBg.dataset.currentAccId = row.dataset.acc;
+    }
+  }, true); /* capture=true per intercettare prima del handler dell'admin */
+})();

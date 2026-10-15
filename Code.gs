@@ -408,12 +408,32 @@ function meRoute_(acc, seg, m, b) {
     return { ok: true };
   }
 
+  if (sub === '' && m === 'DELETE') {
+    /* El usuario elimina su propia cuenta y todos sus datos */
+    if (acc.isAdmin === '1') throw httpErr_(403, 'El administrador no puede eliminarse a sí mismo desde la app.');
+    deleteUserFully_(acc);
+    return { ok: true };
+  }
+
   throw httpErr_(404, 'Ruta no encontrada');
 }
 
 function today_() {
   var d = new Date();
   return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+}
+
+/* Elimina completamente un account: riga Accounts, dati Data e pagamenti Payments */
+function deleteUserFully_(acc) {
+  // 1. Elimina i dati (config, store, ecc.)
+  deleteData_(acc.id);
+  // 2. Elimina i pagamenti dell'utente
+  var sh = sheet_('Payments'), vals = sh.getDataRange().getValues();
+  for (var i = vals.length - 1; i >= 1; i--) {
+    if (String(vals[i][1]) === String(acc.id)) sh.deleteRow(i + 1);
+  }
+  // 3. Elimina la riga account
+  sheet_('Accounts').deleteRow(acc._row);
 }
 
 /* ============ /admin ============ */
@@ -507,6 +527,12 @@ function adminRoute_(seg, m, b) {
       if (b.trialEndsAt !== undefined) ac.trialEndsAt = b.trialEndsAt ? new Date(b.trialEndsAt).toISOString() : '';
       if (b.paidUntil !== undefined) ac.paidUntil = b.paidUntil ? new Date(b.paidUntil).toISOString() : '';
       writeRow_('Accounts', ac._row, ac);
+      return overview_();
+    }
+    if (m === 'DELETE' && id) {
+      var delAcc = getAccount_(id);
+      if (delAcc.isAdmin === '1') throw httpErr_(403, 'No se puede eliminar la cuenta de administrador.');
+      deleteUserFully_(delAcc);
       return overview_();
     }
   }

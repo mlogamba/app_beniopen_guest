@@ -1264,9 +1264,47 @@ function accountCardHTML(){
       ${a.status !== 'admin' ? '<button class="btn primary small" onclick="openPaywall()">⭐ Suscripción</button>' : '<a class="btn court small" href="admin.html">🛠️ Panel admin</a>'}
       <button class="btn ghost small" onclick="openChangePassword()">🔑 Cambiar contraseña</button>
       <button class="btn ghost small" onclick="window.Auth.logout()">🚪 Cerrar sesión</button>
+      ${a.status !== 'admin' ? '<button class="btn ghost small danger" onclick="openDeleteMyAccount()" style="margin-top:4px;width:100%;">🗑️ Eliminar mi cuenta</button>' : ''}
     </div>
   </div>`;
 }
+
+function openDeleteMyAccount(){
+  if(!ME_ACC) return;
+  const email = ME_ACC.email;
+  document.getElementById('modal-title').textContent = '⚠️ Eliminar mi cuenta';
+  document.getElementById('modal-body').innerHTML = `
+    <p class="hint" style="color:var(--loss);font-weight:700;">Esta acción es <b>irreversible</b>. Se borrarán permanentemente tu cuenta, tus partidos y todos tus datos.</p>
+    <p class="hint">Para confirmar, escribe tu email: <b>${escapeHtml(email)}</b></p>
+    <label for="del-email-confirm">Tu email</label>
+    <input type="email" id="del-email-confirm" placeholder="${escapeHtml(email)}" autocomplete="off">
+    <div id="del-msg" class="hint" style="color:var(--loss);margin-top:6px;"></div>
+    <div class="form-actions">
+      <button class="btn ghost danger" onclick="submitDeleteMyAccount()">🗑️ Sí, eliminar mi cuenta</button>
+      <button class="btn ghost" onclick="closeModal()">Cancelar</button>
+    </div>`;
+  document.getElementById('modal-bg').classList.add('open');
+}
+
+async function submitDeleteMyAccount(){
+  const email = ME_ACC && ME_ACC.email;
+  const typed = (document.getElementById('del-email-confirm') || {}).value || '';
+  const msgEl = document.getElementById('del-msg');
+  if(typed.trim().toLowerCase() !== (email||'').toLowerCase()){
+    if(msgEl) msgEl.textContent = 'El email no coincide. Escríbelo exactamente.';
+    return;
+  }
+  if(msgEl) msgEl.textContent = 'Eliminando cuenta…';
+  try{
+    await api('me', {method:'DELETE'});
+    Core.setToken(null);
+    try{ localStorage.removeItem(lsKey); }catch(e){}
+    location.href = location.pathname;
+  }catch(err){
+    if(msgEl) msgEl.textContent = 'Error: ' + err.message;
+  }
+}
+
 
 function paintAjustes(){
   const el = document.getElementById('ajustes-body');
@@ -1573,12 +1611,20 @@ if ('serviceWorker' in navigator) {
   });
 }
 
-/* ---------- Arranque (lo llama src/main.js tras iniciar sesión) ---------- */
+/* ---------- Arranque (lo llama main.js tras iniciar sesión) ---------- */
 window.bootApp = function(me){
   lsKey = 'liguilla_data_' + me.account.id;
   try{ const raw = localStorage.getItem(lsKey); if(raw) store = JSON.parse(raw); }catch(e){}
   store = normalizeStore(store);
-  applyConfig(me.config);
+
+  /* Si viene de onboarding Beniopen, el config ya está en _pendingBeniopenConfig */
+  if(window._pendingBeniopenConfig){
+    applyConfig(window._pendingBeniopenConfig);
+    delete window._pendingBeniopenConfig;
+  } else {
+    applyConfig(me.config);
+  }
+
   applyRemote(me, true);
   setSyncStatus(true, 'conectado a las ' + hhmm());
 
