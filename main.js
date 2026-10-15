@@ -139,27 +139,111 @@
     $('ob-no').onclick = function(){ window._obSkip(); };
   }
 
-  function loadBeniopenGroupsOb(){
-    var loadMsg = $('ob-load-msg');
-    var groupSel = $('ob-group-sel');
-    var errDiv = $('ob-err');
-    loadMsg.style.display = '';
-    loadMsg.textContent = 'Descargando los grupos de beniopen.es… ⏳';
-    errDiv.style.display = 'none';
+  /* ---- Entidades HTML para el parser de beniopen.es ---- */
+  var _htmlEnts = {amp:'&',lt:'<',gt:'>',quot:'"',apos:"'",nbsp:' ',
+    aacute:'á',eacute:'é',iacute:'í',oacute:'ó',uacute:'ú',
+    Aacute:'Á',Eacute:'É',Iacute:'Í',Oacute:'Ó',Uacute:'Ú',
+    ntilde:'ñ',Ntilde:'Ñ',uuml:'ü',ccedil:'ç',agrave:'à',egrave:'è'};
 
-    Core.call('beniopen', 'GET', null).then(function(data){
-      _boDataOnboard = data;
-      loadMsg.style.display = 'none';
-      groupSel.innerHTML = '<option value="">— Elige tu grupo —</option>' +
-        (data.groups || []).map(function(g, i){
+  function textOfEl(h){
+    return String(h)
+      .replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/gi,' ')
+      .replace(/<[^>]*>/g,' ')
+      .replace(/&#x([0-9a-f]+);/gi,function(m,hx){return String.fromCharCode(parseInt(hx,16));})
+      .replace(/&#(\d+);/g,function(m,d){return String.fromCharCode(Number(d));})
+      .replace(/&([a-zA-Z]+);/g,function(m,n){return _htmlEnts[n]!==undefined?_htmlEnts[n]:m;})
+      .replace(/\s+/g,' ').trim();
+  }
+
+  function parseNamesFromHtml(html){
+    var tables=html.match(/<table[\s\S]*?<\/table>/gi)||[], best=[];
+    tables.forEach(function(t){
+      var rows=t.match(/<tr[\s\S]*?<\/tr>/gi)||[], names=[];
+      rows.forEach(function(r){
+        var cells=r.match(/<td[\s\S]*?<\/td>/gi)||[];
+        if(!cells.length) return;
+        var cell=null;
+        for(var i=0;i<cells.length&&!cell;i++) if(/class\s*=\s*["'][^"']*data-name/i.test(cells[i])) cell=cells[i];
+        for(var j=0;j<cells.length&&!cell;j++){ var tx=textOfEl(cells[j]); if(tx&&/[A-Za-zÀ-ÿ]{2,}/.test(tx)) cell=cells[j]; }
+        if(!cell) return;
+        var name=textOfEl(cell);
+        if(name&&!/^(pos|jugador|equipo|total|\d+)$/i.test(name)&&names.indexOf(name)<0) names.push(name);
+      });
+      if(names.length>best.length) best=names;
+    });
+    /* Fallback: enlaces a fichas de jugador */
+    if(!best.length){
+      var re=/<a\s[^>]*href\s*=\s*["'][^"']*\/(?:player|team|jugador|equipo)\/[^"']*["'][^>]*>([\s\S]*?)<\/a>/gi, m;
+      while((m=re.exec(html))!==null){ var n=textOfEl(m[1]); if(n&&/[A-Za-zÀ-ÿ]{2,}/.test(n)&&best.indexOf(n)<0) best.push(n); }
+    }
+    return best;
+  }
+
+  function prettySlugOb(slug){
+    return slug.split('-').map(function(w){
+      return w.length===1 ? w.toUpperCase() : w.charAt(0).toUpperCase()+w.slice(1);
+    }).join(' ');
+  }
+
+  /* Descarga beniopen.es directamente usando un proxy CORS público */
+  function fetchBeniopenDirect(){
+    var slugs=['segunda-a','segunda-b','segunda-c','segunda-d','segunda-e','segunda-f'];
+    var promises=slugs.map(function(slug){
+      var boUrl='https://www.beniopen.es/table/'+slug+'/';
+      /* allorigins.win: proxy CORS gratuito, devuelve {contents:'HTML...'} */
+      var proxy='https://api.allorigins.win/get?url='+encodeURIComponent(boUrl);
+      return fetch(proxy,{cache:'no-cache'})
+        .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
+        .then(function(d){
+          var html=d.contents||'';
+          var players=parseNamesFromHtml(html);
+          if(!players.length) throw new Error('sin jugadores');
+          return {slug:slug, label:prettySlugOb(slug), url:boUrl, players:players};
+        })
+        .catch(function(){ return null; });
+    });
+    return Promise.all(promises).then(function(res){
+      var groups=res.filter(function(g){ return g&&g.players&&g.players.length>0; });
+      if(!groups.length) throw new Error('No se pudo cargar ningún grupo de beniopen.es');
+      return {edition:'37º Beniopen', groups:groups};
+    });
+  }
+
+  var BO_STATIC_DATA = {"edition":"37º Beniopen","updatedAt":1792085492432,"groups":[{"slug":"segunda-a","label":"Segunda A","url":"https://www.beniopen.es/table/segunda-a/","players":["José M. Lara","Julián Ramírez","Sergio Ros","Alex García","Juan González","Marcos Ortíz","Bradley Suter","Enrique Álvarez","Lifeng Ou","Manuel Bullón","Carlos Gutiérrez","Miguel Martínez"]},{"slug":"segunda-b","label":"Segunda B","url":"https://www.beniopen.es/table/segunda-b/","players":["Ramón Andrés","Juan C. Arias","Marcello Gambardella","Juan B. Esteve","Luis Neira","Tim F.","Amalio Mota","Mauricio Senabre","Javier Herrero","Miguel Arellano","Raúl Ruiz","Vale T."]},{"slug":"segunda-c","label":"Segunda C","url":"https://www.beniopen.es/table/segunda-c/","players":["Fernando Vegas","Raúl Ortega","Fernando Guillamón","Daniel Alonso S.","Pablo Carbo","Abel Fernández","Juan Gomis","Alejandro López","Andrés Martínez","Carlos Marquez","José L. Haro","Paco Ordaz"]},{"slug":"segunda-d","label":"Segunda D","url":"https://www.beniopen.es/table/segunda-d/","players":["Adrián García R.","Jesús Bosca","Olek B.","Dmytro A.","Ricardo García M.","Eduardo J. Gómez","Paco Morante","Gerardo Morante","Jorge López","Jesús Guerrero","Marco Catalán","Vicent Escutia"]},{"slug":"segunda-e","label":"Segunda E","url":"https://www.beniopen.es/table/segunda-e/","players":["Agustín I.","Nacho Sánchez","Claudio S.","Dani S.","Jesús Vergara","Pablo Wagner","Rodrigo B.","Álvaro Zancajo","Sebastián Sánchez","Rafa Soria","Raquel Salavert","Cheng Xu"]},{"slug":"segunda-f","label":"Segunda F","url":"https://www.beniopen.es/table/segunda-f/","players":["Vicente Balaguer","Fran Hernández","Juan Sánchez V.","Manuel Agudo","David Méndez","Andrea Romaguera","Andrés Valiente","Antonio Nieto","Israel Marín","Luis Sánchez G.","Nino Villanueva","Maya K."]}]};
+
+  function applyBeniopenData(data){
+    _boDataOnboard=data || BO_STATIC_DATA;
+    var loadMsg=$('ob-load-msg'), groupSel=$('ob-group-sel');
+    if(loadMsg) loadMsg.style.display='none';
+    if(groupSel){
+      groupSel.innerHTML='<option value="">— Elige tu grupo —</option>'+
+        (_boDataOnboard.groups||[]).map(function(g,i){
           return '<option value="'+i+'">'+escHtmlOb(g.label)+' ('+g.players.length+' jugadores)</option>';
         }).join('');
-      groupSel.style.display = '';
-    }).catch(function(err){
-      loadMsg.textContent = '';
-      errDiv.textContent = '⚠️ No se han podido cargar los grupos: ' + err.message + '. Puedes configurarlo manualmente desde ⚙️ Ajustes.';
-      errDiv.style.display = '';
-    });
+      groupSel.style.display='';
+    }
+  }
+
+  function loadBeniopenGroupsOb(){
+    var loadMsg=$('ob-load-msg'), errDiv=$('ob-err');
+    loadMsg.style.display='';
+    loadMsg.textContent='Cargando los grupos del Beniopen… ⏳';
+    errDiv.style.display='none';
+
+    /* 1º tentativo: backend GAS (che legge la scheda del foglio o la cache) */
+    Core.call('beniopen','GET',null)
+      .then(function(data){
+        if(data && data.groups && data.groups.length > 0){
+          applyBeniopenData(data);
+        } else {
+          applyBeniopenData(BO_STATIC_DATA);
+        }
+      })
+      .catch(function(err){
+        console.warn('API beniopen no disponible, usando datos integrados:', err);
+        /* Fallback immediato ai dati del torneo salvati in locale */
+        applyBeniopenData(BO_STATIC_DATA);
+      });
   }
 
   window._obGroupChanged = function(){

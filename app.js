@@ -76,6 +76,8 @@ const DEFAULT_COURTS = [
   {id:"c_vtc",        name:"Valencia Tennis Center · Malvarrosa", address:"Valencia Tennis Center, Malvarrosa, València",  bookingUrl:"https://valenciateniscenter.matchpoint.com.es/"}
 ];
 
+const BO_STATIC_DATA = {"edition":"37º Beniopen","updatedAt":1792085492432,"groups":[{"slug":"segunda-a","label":"Segunda A","url":"https://www.beniopen.es/table/segunda-a/","players":["José M. Lara","Julián Ramírez","Sergio Ros","Alex García","Juan González","Marcos Ortíz","Bradley Suter","Enrique Álvarez","Lifeng Ou","Manuel Bullón","Carlos Gutiérrez","Miguel Martínez"]},{"slug":"segunda-b","label":"Segunda B","url":"https://www.beniopen.es/table/segunda-b/","players":["Ramón Andrés","Juan C. Arias","Marcello Gambardella","Juan B. Esteve","Luis Neira","Tim F.","Amalio Mota","Mauricio Senabre","Javier Herrero","Miguel Arellano","Raúl Ruiz","Vale T."]},{"slug":"segunda-c","label":"Segunda C","url":"https://www.beniopen.es/table/segunda-c/","players":["Fernando Vegas","Raúl Ortega","Fernando Guillamón","Daniel Alonso S.","Pablo Carbo","Abel Fernández","Juan Gomis","Alejandro López","Andrés Martínez","Carlos Marquez","José L. Haro","Paco Ordaz"]},{"slug":"segunda-d","label":"Segunda D","url":"https://www.beniopen.es/table/segunda-d/","players":["Adrián García R.","Jesús Bosca","Olek B.","Dmytro A.","Ricardo García M.","Eduardo J. Gómez","Paco Morante","Gerardo Morante","Jorge López","Jesús Guerrero","Marco Catalán","Vicent Escutia"]},{"slug":"segunda-e","label":"Segunda E","url":"https://www.beniopen.es/table/segunda-e/","players":["Agustín I.","Nacho Sánchez","Claudio S.","Dani S.","Jesús Vergara","Pablo Wagner","Rodrigo B.","Álvaro Zancajo","Sebastián Sánchez","Rafa Soria","Raquel Salavert","Cheng Xu"]},{"slug":"segunda-f","label":"Segunda F","url":"https://www.beniopen.es/table/segunda-f/","players":["Vicente Balaguer","Fran Hernández","Juan Sánchez V.","Manuel Agudo","David Méndez","Andrea Romaguera","Andrés Valiente","Antonio Nieto","Israel Marín","Luis Sánchez G.","Nino Villanueva","Maya K."]}]};
+
 /* ---------- Storage ---------- */
 let store = {matches:{}, cache:{campo:""}, courts:null, privNotes:{}};
 let lsKey = 'liguilla_data';
@@ -1097,13 +1099,11 @@ async function openBeniopenSetup(){
   try{
     if(!BO_DATA) BO_DATA = await api('beniopen');
   }catch(err){
-    document.getElementById('modal-body').innerHTML = `
-      <p class="hint" style="color:var(--loss);">${escapeHtml(err.message)}</p>
-      <div class="form-actions">
-        <button class="btn primary" onclick="openBeniopenSetup()">🔄 Reintentar</button>
-        <button class="btn ghost" onclick="beniopenManual()">Lo haré a mano</button>
-      </div>`;
-    return;
+    console.warn('API beniopen no disponible, usando datos integrados:', err);
+    BO_DATA = BO_STATIC_DATA;
+  }
+  if(!BO_DATA || !BO_DATA.groups || BO_DATA.groups.length === 0){
+    BO_DATA = BO_STATIC_DATA;
   }
   paintBeniopenSetup();
 }
