@@ -1067,7 +1067,7 @@ function loadRemote(force){
     .finally(()=>{ isSyncing = false; });
 }
 
-/* ---------- Suscripción, pagos y donaciones ---------- */
+/* ---------- Donaciones ---------- */
 function fmtLong(iso){ return iso ? new Date(iso).toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'}) : '—'; }
 function money(n){ return (Number(n)||0).toLocaleString('es-ES', {style:'currency', currency: APP_SETTINGS.currency || 'EUR'}); }
 
@@ -1088,27 +1088,25 @@ function paypalPayLink(months){
 function donate(){ window.open(APP_SETTINGS.donationUrl || 'https://www.paypal.com/pool/9tjbXNXSNs?sr=wccr', '_blank', 'noopener'); }
 
 function payBoxHTML(){
-  const price = Number(APP_SETTINGS.monthlyPrice) || 0;
-  const opts = [1,3,6,12].map(n=>`<option value="${n}">${n} ${n>1?'meses':'mes'} · ${money(n*price)}</option>`).join('');
   const pending = ME_ACC && ME_ACC.hasPendingClaim;
+  const donUrl = APP_SETTINGS.donationUrl || 'https://www.paypal.com/pool/9tjbXNXSNs?sr=wccr';
   return `
     <div class="pay-box">
-      <div class="pay-price"><b>${money(price)}</b><span>/ mes</span></div>
-      <label for="pay-months">Periodo</label>
-      <select id="pay-months">${opts}</select>
-      <div class="form-actions">
-        <button class="btn paypal" onclick="goPay()">💳 Pagar con PayPal</button>
-        ${pending
-          ? '<div class="hint center">⏳ Ya has avisado de un pago. El administrador lo confirmará en breve.</div>'
-          : '<button class="btn ghost" onclick="claimPaid()">✅ Ya he pagado</button>'}
+      <div class="donation-info" style="background:var(--bg2,#f5f5f5);border-radius:10px;padding:12px 14px;margin-bottom:12px;font-size:14px;line-height:1.55;">
+        <p style="margin:0 0 8px;">🚧 <b>Estamos trabajando</b> para que esta app acompañe también las <b>fases finales del torneo</b> (16avos, 8avos, cuartos, semis y final).</p>
+        <p style="margin:0;">💡 Los ingresos de esta app se destinan <b>íntegramente a pagar las IAs</b> utilizadas para su desarrollo. ¡Gracias por tu apoyo!</p>
       </div>
-      <p class="hint">El pago se hace en PayPal y vuelves aquí al terminar. Tu suscripción se activa en cuanto el administrador lo confirma.</p>
+      <div class="form-actions">
+        <button class="btn paypal" onclick="donate()">❤️ Donar con PayPal</button>
+        ${pending
+          ? '<div class="hint center">⏳ Ya has avisado tu donación. El administrador lo confirmará en breve.</div>'
+          : '<button class="btn ghost" onclick="claimPaid()">✅ Ya he donado</button>'}
+      </div>
+      <p class="hint" style="margin-top:8px;">La donación se realiza a través de PayPal y tu acceso se activa en cuanto el administrador lo confirma.</p>
     </div>`;
 }
 function goPay(){
-  const months = parseInt(document.getElementById('pay-months').value, 10) || 1;
-  try{ localStorage.setItem('liguilla_pay_months', String(months)); }catch(e){}
-  window.open(paypalPayLink(months), '_blank', 'noopener');
+  donate(); // Redirige a la donación en lugar de pago clásico
 }
 function claimPaid(auto){
   let months = 1;
@@ -1118,7 +1116,7 @@ function claimPaid(auto){
   api('me/claim', {method:'POST', body:{months}})
     .then(()=>{
       if(ME_ACC) ME_ACC.hasPendingClaim = true;
-      showSyncIndicator('✅ Aviso de pago enviado');
+      showSyncIndicator('✅ Aviso de donación enviado');
       if(!auto) closeModal();
       renderSubscription(false);
     })
@@ -1127,11 +1125,11 @@ function claimPaid(auto){
 function openPaywall(){
   const st = ME_ACC ? ME_ACC.status : 'trial';
   const intro = st === 'due'
-    ? `Tu periodo terminó el <b>${fmtLong(ME_ACC.expiresAt)}</b>. Puedes seguir usando la app hasta el <b>${fmtLong(ME_ACC.graceEndsAt)}</b>; después se bloqueará hasta renovar.`
+    ? `Tu periodo de acceso terminó el <b>${fmtLong(ME_ACC.expiresAt)}</b>. Puedes seguir usando la app hasta el <b>${fmtLong(ME_ACC.graceEndsAt)}</b>; después se bloqueará hasta confirmar tu donación.`
     : st === 'trial'
-      ? `Tu prueba gratuita termina el <b>${fmtLong(ME_ACC.expiresAt)}</b>. Suscríbete para seguir usando la app sin interrupciones.`
-      : `Tu suscripción está activa hasta el <b>${fmtLong(ME_ACC && ME_ACC.expiresAt)}</b>. Puedes renovarla por adelantado.`;
-  document.getElementById('modal-title').textContent = '⭐ Suscripción mensual';
+      ? `Tu acceso gratuito termina el <b>${fmtLong(ME_ACC.expiresAt)}</b>. Con una donación sigues usando la app sin interrupciones.`
+      : `Tu acceso está activo hasta el <b>${fmtLong(ME_ACC && ME_ACC.expiresAt)}</b>. Puedes hacer una nueva donación por adelantado.`;
+  document.getElementById('modal-title').textContent = '❤️ Apoya el desarrollo';
   document.getElementById('modal-body').innerHTML = `<p class="hint" style="margin-bottom:6px;">${intro}</p>${payBoxHTML()}
     <div class="form-actions"><button class="btn ghost" onclick="closeModal()">Más tarde</button></div>`;
   document.getElementById('modal-bg').classList.add('open');
@@ -1143,11 +1141,11 @@ function renderSubBanner(){
   const a = ME_ACC, warn = Number(APP_SETTINGS.warnDaysBefore) || 0;
   let html = '';
   if(a.hasPendingClaim && (a.status === 'due' || a.status === 'trial')){
-    html = `<div class="sub-banner info">⏳ Pago avisado: pendiente de confirmación por el administrador.</div>`;
+    html = `<div class="sub-banner info">⏳ Donación avisada: pendiente de confirmación por el administrador.</div>`;
   } else if(a.status === 'due'){
-    html = `<div class="sub-banner due" role="button" onclick="openPaywall()"><b>Tu periodo ha terminado.</b> Renueva por ${money(APP_SETTINGS.monthlyPrice)}/mes antes del ${fmtLong(a.graceEndsAt)}. <u>Pagar ahora</u></div>`;
+    html = `<div class="sub-banner due" role="button" onclick="openPaywall()"><b>Tu periodo de acceso ha terminado.</b> Haz una donación antes del ${fmtLong(a.graceEndsAt)} para seguir. <u>Donar ahora</u></div>`;
   } else if(a.status === 'trial' && a.daysLeft <= warn){
-    html = `<div class="sub-banner warn" role="button" onclick="openPaywall()">Tu prueba gratuita termina en <b>${a.daysLeft} ${a.daysLeft===1?'día':'días'}</b>. <u>Suscribirme</u></div>`;
+    html = `<div class="sub-banner warn" role="button" onclick="openPaywall()">Tu acceso gratuito termina en <b>${a.daysLeft} ${a.daysLeft===1?'día':'días'}</b>. <u>Apoyar el desarrollo</u></div>`;
   }
   el.innerHTML = html;
 }
@@ -1162,7 +1160,7 @@ function renderSubscription(first){
     const contact = APP_SETTINGS.paypalEmail || '';
     document.getElementById('lock-body').innerHTML = st === 'disabled'
       ? `<h2>Cuenta desactivada</h2><p class="hint">El administrador ha desactivado esta cuenta. Si crees que es un error, escribe a <a href="mailto:${escapeHtml(contact)}">${escapeHtml(contact)}</a>.</p>`
-      : `<h2>Renueva tu suscripción</h2><p class="hint">Tu periodo terminó el <b>${fmtLong(ME_ACC.expiresAt)}</b>. Tus datos están guardados: en cuanto se confirme el pago vuelves a tenerlo todo.</p>${payBoxHTML()}`;
+      : `<h2>Apoya el desarrollo ❤️</h2><p class="hint">Tu periodo de acceso terminó el <b>${fmtLong(ME_ACC.expiresAt)}</b>. Tus datos están guardados: en cuanto se confirme tu donación vuelves a tenerlo todo.</p>${payBoxHTML()}`;
     lock.classList.add('open');
   } else {
     lock.classList.remove('open');
@@ -1371,15 +1369,15 @@ function renderAjustes(){
 function accountCardHTML(){
   if(!ME_ACC) return '';
   const a = ME_ACC;
-  const label = {admin:'Administrador', trial:'Prueba gratuita', paid:'Suscripción activa', due:'Pendiente de pago', blocked:'Bloqueada', disabled:'Desactivada'}[a.status] || a.status;
+  const label = {admin:'Administrador', trial:'Acceso gratuito', paid:'Acceso activo', due:'Donación pendiente', blocked:'Bloqueada', disabled:'Desactivada'}[a.status] || a.status;
   const cls = {admin:'win', trial:'sched', paid:'win', due:'loss', blocked:'loss', disabled:'loss'}[a.status] || 'todo';
-  const until = a.status === 'admin' ? 'Sin vencimiento' : (a.status === 'trial' ? 'Prueba hasta el ' : 'Activa hasta el ') + fmtLong(a.expiresAt);
+  const until = a.status === 'admin' ? 'Sin vencimiento' : (a.status === 'trial' ? 'Acceso gratuito hasta el ' : 'Acceso activo hasta el ') + fmtLong(a.expiresAt);
   return `<div class="card">
     <h3>Mi cuenta</h3>
     <div class="acc-line"><span>${escapeHtml(a.email)}</span><span class="pill ${cls}">${label}</span></div>
-    <p class="hint">${until}${a.hasPendingClaim ? ' · ⏳ pago pendiente de confirmar' : ''}</p>
+    <p class="hint">${until}${a.hasPendingClaim ? ' · ⏳ donación pendiente de confirmar' : ''}</p>
     <div class="row-actions">
-      ${a.status !== 'admin' ? '<button class="btn primary small" onclick="openPaywall()">⭐ Suscripción</button>' : '<a class="btn court small" href="admin.html">🛠️ Panel admin</a>'}
+      ${a.status !== 'admin' ? '<button class="btn primary small" onclick="openPaywall()">❤️ Donar</button>' : '<a class="btn court small" href="admin.html">🛠️ Panel admin</a>'}
       <button class="btn ghost small" onclick="openChangePassword()">🔑 Cambiar contraseña</button>
       <button class="btn ghost small" onclick="window.Auth.logout()">🚪 Cerrar sesión</button>
       ${a.status !== 'admin' ? '<button class="btn ghost small danger" onclick="openDeleteMyAccount()" style="margin-top:4px;width:100%;">🗑️ Eliminar mi cuenta</button>' : ''}
