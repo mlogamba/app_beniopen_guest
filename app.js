@@ -1086,6 +1086,116 @@ function renderSubscription(first){
   }
 }
 
+/* ---------- Importar rivales desde el Beniopen ---------- */
+let BO_DATA = null;
+const boSort = (x, y) => x.localeCompare(y, 'es', {sensitivity:'base'});
+
+async function openBeniopenSetup(){
+  document.getElementById('modal-title').textContent = '🎾 Configurar con el Beniopen';
+  document.getElementById('modal-body').innerHTML = '<p class="hint">Cargando los jugadores del Beniopen…</p>';
+  document.getElementById('modal-bg').classList.add('open');
+  try{
+    if(!BO_DATA) BO_DATA = await api('beniopen');
+  }catch(err){
+    document.getElementById('modal-body').innerHTML = `
+      <p class="hint" style="color:var(--loss);">${escapeHtml(err.message)}</p>
+      <div class="form-actions">
+        <button class="btn primary" onclick="openBeniopenSetup()">🔄 Reintentar</button>
+        <button class="btn ghost" onclick="beniopenManual()">Lo haré a mano</button>
+      </div>`;
+    return;
+  }
+  paintBeniopenSetup();
+}
+
+function paintBeniopenSetup(){
+  const groups = BO_DATA.groups || [];
+  document.getElementById('modal-body').innerHTML = `
+    <p class="hint" style="margin-top:0;">Elige tu categoría y tu nombre. La app añadirá a todos los demás jugadores de tu grupo como rivales. Después tendrás que ordenar tú las jornadas.</p>
+    <label for="bo-group">Categoría / grupo</label>
+    <select id="bo-group" onchange="boGroupChanged()">
+      <option value="">— Elige tu grupo —</option>
+      ${groups.map((g,i)=>`<option value="${i}">${escapeHtml(g.label)} (${g.players.length})</option>`).join('')}
+    </select>
+    <label for="bo-player">Tu nombre</label>
+    <select id="bo-player" onchange="boPlayerChanged()" disabled><option value="">— Primero elige el grupo —</option></select>
+    <div id="bo-preview" class="hint"></div>
+    <div class="form-actions">
+      <button class="btn primary" id="bo-go" onclick="beniopenImport()" disabled>✅ Importar mis rivales</button>
+      <button class="btn ghost" onclick="beniopenManual()">No juego el Beniopen / lo haré a mano</button>
+    </div>`;
+  // si ya hay un nombre configurado, intenta preseleccionar su grupo
+  if(CFG.playerName){
+    const gi = groups.findIndex(g=>g.players.some(p=>p.toLowerCase() === CFG.playerName.toLowerCase()));
+    if(gi > -1){ document.getElementById('bo-group').value = String(gi); boGroupChanged(); }
+  }
+}
+
+function boGroupChanged(){
+  const gi = document.getElementById('bo-group').value;
+  const sel = document.getElementById('bo-player');
+  if(gi === ''){ sel.disabled = true; sel.innerHTML = '<option value="">— Primero elige el grupo —</option>'; boPlayerChanged(); return; }
+  const g = BO_DATA.groups[+gi];
+  const mine = (CFG.playerName || '').toLowerCase();
+  sel.disabled = false;
+  sel.innerHTML = '<option value="">— Elige tu nombre —</option>' +
+    g.players.slice().sort(boSort).map(p=>`<option value="${escapeHtml(p)}"${p.toLowerCase()===mine?' selected':''}>${escapeHtml(p)}</option>`).join('');
+  boPlayerChanged();
+}
+
+function boPlayerChanged(){
+  const gi = document.getElementById('bo-group').value;
+  const me = document.getElementById('bo-player').value;
+  const prev = document.getElementById('bo-preview'), go = document.getElementById('bo-go');
+  if(gi === '' || !me){ prev.textContent = ''; go.disabled = true; return; }
+  const n = BO_DATA.groups[+gi].players.length - 1;
+  prev.innerHTML = `Se añadirán <b>${n} rivales</b> de ${escapeHtml(BO_DATA.groups[+gi].label)} y se enlazará la clasificación del grupo.`;
+  go.disabled = false;
+}
+
+function beniopenManual(){
+  try{ localStorage.setItem('liguilla_bo_skip', '1'); }catch(e){}
+  closeModal();
+  showView('ajustes');
+}
+
+function beniopenImport(){
+  const gi = document.getElementById('bo-group').value;
+  const me = document.getElementById('bo-player').value;
+  if(gi === '' || !me) return;
+  const g = BO_DATA.groups[+gi];
+  const others = g.players.filter(n=>n !== me).sort(boSort);
+  const hasData = Object.values(store.matches || {}).some(m=>m && (m.played || m.done || m.date || m.myScore != null || m.notes));
+  if(isConfigured() && hasData && !confirm('Ya tienes partidos registrados. Al importar se sustituyen tus rivales y jornadas y se borrarán esos partidos. ¿Continuar?')) return;
+
+  // conserva teléfono, email y ranking de los rivales que ya tenías
+  const prev = {}; (CFG.opponents || []).forEach(o=>{ prev[o.name.toLowerCase()] = o; });
+  const opponents = others.map(n=>{ const p = prev[n.toLowerCase()] || {}; return {name:n, phone:p.phone||'', email:p.email||'', ranking:p.ranking||null}; });
+  // conserva el orden de jornadas de los rivales que ya estaban y añade el resto
+  const kept = (CFG.fixture || []).filter(f=>others.includes(f.opp)).map(f=>({opp:f.opp, from:f.from||'', to:f.to||''}));
+  const used = new Set(kept.map(f=>f.opp));
+  const fixture = kept.concat(others.filter(n=>!used.has(n)).map(n=>({opp:n, from:'', to:''})));
+
+  const clean = {
+    playerName: me, myRanking: CFG.myRanking || null,
+    tournament: BO_DATA.edition || CFG.tournament || '37º Beniopen', group: g.label,
+    pointsWin: CFG.pointsWin, pointsLoss: CFG.pointsLoss, org: CFG.org,
+    links: {clasificacion: g.url, resultados: (CFG.links && CFG.links.resultados) || ''},
+    opponents, fixture, legacyGasUrl: CFG.legacyGasUrl || ''
+  };
+  store.matches = {};
+  applyConfig(clean);
+  save();
+  api('me/config', {method:'PUT', body:{value: clean}}).catch(()=>{});
+  window._boHint = true;
+  try{ localStorage.removeItem('liguilla_bo_skip'); }catch(e){}
+  closeModal();
+  if(typeof refreshAll === 'function') refreshAll();
+  showView('ajustes');
+  renderAjustes();
+  setTimeout(()=>{ const el = document.getElementById('fix-list'); if(el) el.scrollIntoView({behavior:'smooth', block:'start'}); }, 300);
+}
+
 /* ---------- Cambiar contraseña ---------- */
 function openChangePassword(){
   document.getElementById('modal-title').textContent = '🔑 Cambiar contraseña';
@@ -1166,6 +1276,12 @@ function paintAjustes(){
   const oppOptions = sel => '<option value="">— Rival —</option>' + d.opponents.filter(o=>o.name).map(o=>`<option value="${v(o.name)}"${o.name===sel?' selected':''}>${v(o.name)}</option>`).join('');
   el.innerHTML = `
     ${accountCardHTML()}
+    ${window._boHint ? '<div class="card" style="border:2px solid var(--court);"><b>✅ Rivales importados del Beniopen.</b><p class="hint" style="margin:6px 0 0;">Ahora ordena tus jornadas: en "Jornadas" elige el rival de cada una (o usa ↑ ↓) y las fechas, y pulsa <b>Guardar ajustes</b>.</p></div>' : ''}
+    <div class="card">
+      <h3>Beniopen</h3>
+      <p class="hint">Si juegas el Beniopen, elige tu categoría y tu nombre: la app descarga a tus rivales de beniopen.es.</p>
+      <button type="button" class="btn court small" style="width:100%;" onclick="openBeniopenSetup()">🎾 Importar rivales desde el Beniopen</button>
+    </div>
     <div class="card">
       <h3>Mis datos</h3>
       <label for="cfg-name">Tu nombre (como aparece en el torneo)</label>
@@ -1229,6 +1345,7 @@ function paintAjustes(){
           <div class="cfg-row" data-i="${i}">
             <div class="cfg-row-head"><b>Jornada ${i+1}</b>
               <span>${i>0?`<button type="button" class="set-remove" onclick="moveJornada(${i},-1)" aria-label="Subir">↑</button>`:''}
+              ${i<d.fixture.length-1?`<button type="button" class="set-remove" onclick="moveJornada(${i},1)" aria-label="Bajar">↓</button>`:''}
               <button type="button" class="set-remove" onclick="delJornada(${i})">✕ quitar</button></span></div>
             <select class="f-opp">${oppOptions(f.opp)}</select>
             <div class="inputs2col">
@@ -1393,6 +1510,7 @@ function saveAjustes(){
 
   const clean = JSON.parse(JSON.stringify(d, (k,val)=> k.startsWith('_') ? undefined : val));
   clean.fixture = clean.fixture.map(f=>({opp:f.opp, from:f.from||'', to:f.to||''}));
+  window._boHint = false;
   applyConfig(clean);
   save();
   showSyncIndicator('Guardando ajustes…');
@@ -1468,7 +1586,11 @@ window.bootApp = function(me){
     history.replaceState(null, '', location.pathname);
     if(!ME_ACC.hasPendingClaim && ME_ACC.status !== 'admin') claimPaid(true);
   }
-  if(!isConfigured()) showView('ajustes');
+  if(!isConfigured()){
+    showView('ajustes');
+    let skip = false; try{ skip = localStorage.getItem('liguilla_bo_skip') === '1'; }catch(e){}
+    if(!skip) setTimeout(openBeniopenSetup, 400);
+  }
 
   let syncTimer = setInterval(()=>loadRemote(false), 60000);
   document.addEventListener('visibilitychange', function(){

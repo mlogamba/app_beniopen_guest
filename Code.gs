@@ -32,7 +32,8 @@ var DEFAULT_SETTINGS = {
   currency: 'EUR',
   paypalEmail: '',
   donationUrl: 'https://www.paypal.com/pool/9tjbXNXSNs?sr=wccr',
-  signupOpen: '1'
+  signupOpen: '1',
+  beniopenEdition: '37º Beniopen'
 };
 
 /* ============ Entradas HTTP ============ */
@@ -78,6 +79,7 @@ function route_(req) {
   if (p === 'auth/reset') return authReset_(b);
 
   var acc = authenticate_(req.t);
+  if (seg[0] === 'beniopen') return getBeniopen_();
   if (seg[0] === 'me') return meRoute_(acc, seg, m, b);
   if (seg[0] === 'admin') {
     if (acc.isAdmin !== '1') throw httpErr_(403, 'No autorizado');
@@ -509,6 +511,12 @@ function adminRoute_(seg, m, b) {
     }
   }
 
+  if (res === 'beniopen' && id === 'refresh' && m === 'POST') {
+    var fresh = scrapeBeniopen_();
+    setData_('_beniopen', 'cache', JSON.stringify(fresh));
+    return overview_();
+  }
+
   if (res === 'settings' && m === 'PUT') {
     var patch = {};
     ['trialDays', 'graceDays', 'warnDaysBefore', 'monthlyPrice'].forEach(function (k) {
@@ -522,6 +530,142 @@ function adminRoute_(seg, m, b) {
   }
 
   throw httpErr_(404, 'Ruta no encontrada');
+}
+
+/* ============ Beniopen: grupos y jugadores (se leen de beniopen.es) ============ */
+var BO_BASE = 'https://www.beniopen.es/';
+var BO_SEED = BO_BASE + 'table/segunda-b/';          // página que contiene el menú con todos los grupos
+var BO_FALLBACK = ['segunda-a', 'segunda-b', 'segunda-c', 'segunda-d', 'segunda-e'];
+var BO_TTL = 12 * 3600000;                           // la lista se refresca como máximo cada 12 h
+var BO_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36';
+
+function getBeniopen_() {
+  var S = settings_();
+  var cache = readBoCache_();
+  if (!cache || Date.now() - cache.updatedAt > BO_TTL) {
+    var lock = LockService.getScriptLock();
+    if (lock.tryLock(10000)) {
+      try {
+        var again = readBoCache_();
+        if (again && Date.now() - again.updatedAt <= BO_TTL) { cache = again; }
+        else {
+          try {
+            cache = scrapeBeniopen_();
+            setData_('_beniopen', 'cache', JSON.stringify(cache));
+          } catch (e) {
+            if (!cache) throw httpErr_(502, 'No se han podido leer los jugadores de beniopen.es: ' + e.message);
+          }
+        }
+      } finally { lock.releaseLock(); }
+    } else if (!cache) {
+      throw httpErr_(503, 'El servidor está ocupado. Inténtalo de nuevo en unos segundos.');
+    }
+  }
+  return { edition: cache.edition || S.beniopenEdition, updatedAt: cache.updatedAt, groups: cache.groups };
+}
+
+function readBoCache_() {
+  try {
+    var raw = readData_('_beniopen').cache;
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) { return null; }
+}
+
+function fetchHtml_(url) {
+  var r = UrlFetchApp.fetch(url, { muteHttpExceptions: true, followRedirects: true, headers: { 'User-Agent': BO_UA, 'Accept-Language': 'es-ES,es;q=0.9' } });
+  if (r.getResponseCode() !== 200) throw new Error('HTTP ' + r.getResponseCode() + ' en ' + url);
+  return r.getContentText();
+}
+
+function scrapeBeniopen_() {
+  var seed = fetchHtml_(BO_SEED);
+  var slugs = discoverGroups_(seed);
+  if (slugs.indexOf('segunda-b') < 0) slugs.push('segunda-b');
+  if (slugs.length < 2) slugs = BO_FALLBACK.slice();
+  var reqs = slugs.map(function (sl) {
+    return { url: BO_BASE + 'table/' + sl + '/', muteHttpExceptions: true, followRedirects: true, headers: { 'User-Agent': BO_UA, 'Accept-Language': 'es-ES,es;q=0.9' } };
+  });
+  var resp = UrlFetchApp.fetchAll(reqs), groups = [];
+  resp.forEach(function (r, i) {
+    if (r.getResponseCode() !== 200) return;
+    var names = parseNames_(r.getContentText());
+    if (names.length) groups.push({ slug: slugs[i], label: prettySlug_(slugs[i]), url: reqs[i].url, players: names });
+  });
+  if (!groups.length) throw new Error('no se ha encontrado ningún jugador en las tablas');
+  return { updatedAt: Date.now(), edition: detectEdition_(seed), groups: groups };
+}
+
+function discoverGroups_(html) {
+  var re = /href\s*=\s*["'](?:https?:\/\/(?:www\.)?beniopen\.es)?\/table\/([a-z0-9_%\-]+)\/?["']/gi, m, out = [];
+  while ((m = re.exec(html))) { if (out.indexOf(m[1]) < 0) out.push(m[1]); }
+  return out;
+}
+
+function detectEdition_(html) {
+  var re = /(\d{1,3})\s*(?:º|°|&ordm;|&deg;|&#186;|&#176;)\s*Beniopen/gi, m, max = 0;
+  while ((m = re.exec(html))) { var n = Number(m[1]); if (n > max && n < 200) max = n; }
+  return max ? max + 'º Beniopen' : '';
+}
+
+function prettySlug_(slug) {
+  return slug.split('-').map(function (w) {
+    return w.length === 1 ? w.toUpperCase() : w.charAt(0).toUpperCase() + w.slice(1);
+  }).join(' ');
+}
+
+var HTML_ENT = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', rsquo: "'", lsquo: "'",
+  aacute: 'á', eacute: 'é', iacute: 'í', oacute: 'ó', uacute: 'ú', Aacute: 'Á', Eacute: 'É', Iacute: 'Í', Oacute: 'Ó', Uacute: 'Ú',
+  ntilde: 'ñ', Ntilde: 'Ñ', uuml: 'ü', Uuml: 'Ü', ccedil: 'ç', Ccedil: 'Ç', agrave: 'à', egrave: 'è', ograve: 'ò' };
+
+function textOf_(html) {
+  return String(html)
+    .replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/&#x([0-9a-f]+);/gi, function (m, h) { return String.fromCharCode(parseInt(h, 16)); })
+    .replace(/&#(\d+);/g, function (m, d) { return String.fromCharCode(Number(d)); })
+    .replace(/&([a-zA-Z]+);/g, function (m, n) { return HTML_ENT[n] !== undefined ? HTML_ENT[n] : m; })
+    .replace(/\s+/g, ' ').trim();
+}
+
+/* Devuelve los nombres de la tabla con más filas de la página (clasificación del grupo) */
+function parseNames_(html) {
+  var tables = html.match(/<table[\s\S]*?<\/table>/gi) || [], best = [];
+  tables.forEach(function (t) {
+    var rows = t.match(/<tr[\s\S]*?<\/tr>/gi) || [], names = [];
+    rows.forEach(function (r) {
+      var cells = r.match(/<td[\s\S]*?<\/td>/gi) || [];
+      if (!cells.length) return;
+      var cell = null;
+      for (var i = 0; i < cells.length && !cell; i++) if (/class\s*=\s*["'][^"']*data-name/i.test(cells[i])) cell = cells[i];
+      for (var j = 0; j < cells.length && !cell; j++) if (/[A-Za-zÀ-ÿ]{2,}/.test(textOf_(cells[j]))) cell = cells[j];
+      if (!cell) return;
+      var name = textOf_(cell);
+      if (name && !/^(pos|jugador|equipo|total)$/i.test(name) && names.indexOf(name) < 0) names.push(name);
+    });
+    if (names.length > best.length) best = names;
+  });
+  if (!best.length) {   // plan B: enlaces a fichas de jugador/equipo
+    var re = /<a\s[^>]*href\s*=\s*["'][^"']*\/(?:player|team|jugador|equipo)\/[^"']*["'][^>]*>([\s\S]*?)<\/a>/gi, m;
+    while ((m = re.exec(html))) { var n = textOf_(m[1]); if (n && /[A-Za-zÀ-ÿ]{2,}/.test(n) && best.indexOf(n) < 0) best.push(n); }
+  }
+  return best;
+}
+
+/* Ejecuta esta función desde el editor para comprobar la lectura de beniopen.es */
+function testBeniopen() {
+  var html = fetchHtml_(BO_SEED);
+  Logger.log('Grupos detectados en el menú: ' + discoverGroups_(html).join(', '));
+  Logger.log('Edición detectada: ' + detectEdition_(html));
+  var names = parseNames_(html);
+  Logger.log('Jugadores en segunda-b: ' + names.length + ' → ' + names.join(' | '));
+  if (!names.length) {
+    Logger.log('NO SE HAN ENCONTRADO JUGADORES. Longitud del HTML: ' + html.length);
+    Logger.log('Primer <table> para depurar: ' + (html.match(/<table[\s\S]*?<\/table>/i) || ['(no hay ninguna <table>)'])[0].substr(0, 3000));
+    return;
+  }
+  var c = scrapeBeniopen_();
+  setData_('_beniopen', 'cache', JSON.stringify(c));
+  Logger.log('Guardado en caché:\n' + c.groups.map(function (g) { return g.label + ': ' + g.players.length + ' jugadores'; }).join('\n'));
 }
 
 /* ============ Instalación (ejecutar UNA vez desde el editor) ============ */
