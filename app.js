@@ -95,6 +95,74 @@ const BO_SEGUNDA_B_CONTACTS = {
   'luis neira':         {phone:'652096096',        email:'infoluisneira@gmail.com'}
 };
 
+/* Fechas oficiales de las 11 jornadas del 37º Beniopen (FECHAS 37º BENIOPEN.docx) */
+const BO_JORNADAS_DATES = [
+  {from:'2026-09-22', to:'2026-09-28'},  // J1
+  {from:'2026-09-29', to:'2026-10-05'},  // J2
+  {from:'2026-10-06', to:'2026-10-12'},  // J3
+  {from:'2026-10-13', to:'2026-10-19'},  // J4
+  {from:'2026-10-20', to:'2026-10-26'},  // J5
+  {from:'2026-10-27', to:'2026-11-02'},  // J6
+  {from:'2026-11-03', to:'2026-11-09'},  // J7
+  {from:'2026-11-10', to:'2026-11-16'},  // J8
+  {from:'2026-11-17', to:'2026-11-23'},  // J9
+  {from:'2026-11-24', to:'2026-11-30'},  // J10
+  {from:'2026-12-01', to:'2026-12-10'}   // J11
+];
+
+/* Orden de juego oficial Segunda B 37 (ORDEN DE JUEGO SEGUNDA B 37.xlsx)
+   Cada entrada: nombre_del_jugador_lowercase → [rival_j1, rival_j2, …, rival_j11]
+   Los nombres de rivales coinciden EXACTAMENTE con los de beniopen_data.json */
+const BO_SEGUNDA_B_FIXTURE = {
+  'marcello gambardella': ['Amalio Mota','Vale T.','Miguel Arellano','Tim F.','Mauricio Senabre','Juan C. Arias','Javier Herrero','Ramón Andrés','Raúl Ruiz','Juan B. Esteve','Luis Neira'],
+  'amalio mota':          ['Marcello Gambardella','Ramón Andrés','Vale T.','Raúl Ruiz','Tim F.','Juan B. Esteve','Mauricio Senabre','Luis Neira','Juan C. Arias','Miguel Arellano','Javier Herrero'],
+  'ramón andrés':         ['Raúl Ruiz','Amalio Mota','Javier Herrero','Juan B. Esteve','Luis Neira','Miguel Arellano','Vale T.','Marcello Gambardella','Tim F.','Mauricio Senabre','Juan C. Arias'],
+  'raúl ruiz':            ['Ramón Andrés','Javier Herrero','Juan C. Arias','Amalio Mota','Juan B. Esteve','Luis Neira','Miguel Arellano','Vale T.','Marcello Gambardella','Tim F.','Mauricio Senabre'],
+  'vale t.':              ['Tim F.','Marcello Gambardella','Amalio Mota','Mauricio Senabre','Juan C. Arias','Javier Herrero','Ramón Andrés','Raúl Ruiz','Juan B. Esteve','Luis Neira','Miguel Arellano'],
+  'tim f.':               ['Vale T.','Miguel Arellano','Luis Neira','Marcello Gambardella','Amalio Mota','Mauricio Senabre','Juan C. Arias','Javier Herrero','Ramón Andrés','Raúl Ruiz','Juan B. Esteve'],
+  'javier herrero':       ['Juan B. Esteve','Raúl Ruiz','Ramón Andrés','Luis Neira','Miguel Arellano','Vale T.','Marcello Gambardella','Tim F.','Mauricio Senabre','Juan C. Arias','Amalio Mota'],
+  'juan b. esteve':       ['Javier Herrero','Juan C. Arias','Mauricio Senabre','Ramón Andrés','Raúl Ruiz','Amalio Mota','Luis Neira','Miguel Arellano','Vale T.','Marcello Gambardella','Tim F.'],
+  'miguel arellano':      ['Mauricio Senabre','Tim F.','Marcello Gambardella','Juan C. Arias','Javier Herrero','Ramón Andrés','Raúl Ruiz','Juan B. Esteve','Luis Neira','Amalio Mota','Vale T.'],
+  'mauricio senabre':     ['Miguel Arellano','Luis Neira','Juan B. Esteve','Vale T.','Marcello Gambardella','Tim F.','Amalio Mota','Juan C. Arias','Javier Herrero','Ramón Andrés','Raúl Ruiz'],
+  'luis neira':           ['Juan C. Arias','Mauricio Senabre','Tim F.','Javier Herrero','Ramón Andrés','Raúl Ruiz','Juan B. Esteve','Amalio Mota','Miguel Arellano','Vale T.','Marcello Gambardella'],
+  'juan c. arias':        ['Luis Neira','Juan B. Esteve','Raúl Ruiz','Miguel Arellano','Vale T.','Marcello Gambardella','Tim F.','Mauricio Senabre','Amalio Mota','Javier Herrero','Ramón Andrés']
+};
+
+/**
+ * Restituisce il fixture ordinato (con date ufficiali) per un giocatore di Segunda B.
+ * - Se il giocatore è nel BO_SEGUNDA_B_FIXTURE, usa l'ordine ufficiale.
+ * - Se non trovato (es. nome con variante), usa l'ordine alfabetico come fallback.
+ * - Conserva i dati dei partiti già presenti in CFG.fixture (date, note, ecc.)
+ * @param {string} playerName  - Nome esatto del giocatore (come in beniopen_data.json)
+ * @param {string[]} others    - Lista degli altri giocatori del gruppo (i rivali)
+ * @param {Object[]} prevFixture - Fixture precedente di CFG (per conservare date già fissate)
+ */
+function boFixtureForPlayer(playerName, others, prevFixture){
+  const key = playerName.toLowerCase();
+  const officialOrder = BO_SEGUNDA_B_FIXTURE[key];
+  // Ordine ufficiale filtrato agli avversari reali del gruppo (esclude se stesso)
+  let ordered;
+  if(officialOrder){
+    ordered = officialOrder.filter(n => others.includes(n));
+    // Aggiunge eventuali rivali non presenti nell'ordine ufficiale (per sicurezza)
+    others.forEach(n => { if(!ordered.includes(n)) ordered.push(n); });
+  } else {
+    ordered = others.slice(); // fallback: ordine alfabetico/originale
+  }
+  // Costruisce il fixture con le date ufficiali e conserva le date già impostate
+  const prevByOpp = {};
+  (prevFixture || []).forEach(f => { if(f.opp) prevByOpp[f.opp] = f; });
+  return ordered.map((opp, i) => {
+    const prev = prevByOpp[opp];
+    const dates = BO_JORNADAS_DATES[i] || {from:'', to:''};
+    return {
+      opp,
+      from: (prev && prev.from) || dates.from,
+      to:   (prev && prev.to)   || dates.to
+    };
+  });
+}
+
 const BO_STATIC_DATA = {"edition":"37º Beniopen","updatedAt":1792085492432,"groups":[{"slug":"segunda-a","label":"Segunda A","url":"https://www.beniopen.es/table/segunda-a/","players":["José M. Lara","Julián Ramírez","Sergio Ros","Alex García","Juan González","Marcos Ortíz","Bradley Suter","Enrique Álvarez","Lifeng Ou","Manuel Bullón","Carlos Gutiérrez","Miguel Martínez"]},{"slug":"segunda-b","label":"Segunda B","url":"https://www.beniopen.es/table/segunda-b/","players":["Ramón Andrés","Juan C. Arias","Marcello Gambardella","Juan B. Esteve","Luis Neira","Tim F.","Amalio Mota","Mauricio Senabre","Javier Herrero","Miguel Arellano","Raúl Ruiz","Vale T."]},{"slug":"segunda-c","label":"Segunda C","url":"https://www.beniopen.es/table/segunda-c/","players":["Fernando Vegas","Raúl Ortega","Fernando Guillamón","Daniel Alonso S.","Pablo Carbo","Abel Fernández","Juan Gomis","Alejandro López","Andrés Martínez","Carlos Marquez","José L. Haro","Paco Ordaz"]},{"slug":"segunda-d","label":"Segunda D","url":"https://www.beniopen.es/table/segunda-d/","players":["Adrián García R.","Jesús Bosca","Olek B.","Dmytro A.","Ricardo García M.","Eduardo J. Gómez","Paco Morante","Gerardo Morante","Jorge López","Jesús Guerrero","Marco Catalán","Vicent Escutia"]},{"slug":"segunda-e","label":"Segunda E","url":"https://www.beniopen.es/table/segunda-e/","players":["Agustín I.","Nacho Sánchez","Claudio S.","Dani S.","Jesús Vergara","Pablo Wagner","Rodrigo B.","Álvaro Zancajo","Sebastián Sánchez","Rafa Soria","Raquel Salavert","Cheng Xu"]},{"slug":"segunda-f","label":"Segunda F","url":"https://www.beniopen.es/table/segunda-f/","players":["Vicente Balaguer","Fran Hernández","Juan Sánchez V.","Manuel Agudo","David Méndez","Andrea Romaguera","Andrés Valiente","Antonio Nieto","Israel Marín","Luis Sánchez G.","Nino Villanueva","Maya K."]}]};
 
 /* ---------- Storage ---------- */
@@ -1202,10 +1270,21 @@ function beniopenImport(){
       ranking: p.ranking || null
     };
   });
-  // conserva el orden de jornadas de los rivales que ya estaban y añade el resto
-  const kept = (CFG.fixture || []).filter(f=>others.includes(f.opp)).map(f=>({opp:f.opp, from:f.from||'', to:f.to||''}));
-  const used = new Set(kept.map(f=>f.opp));
-  const fixture = kept.concat(others.filter(n=>!used.has(n)).map(n=>({opp:n, from:'', to:''})));
+  // Costruisce il fixture con ordine e date ufficiali
+  let fixture;
+  if(isSegundaB){
+    // Segunda B: usa l'ordine ufficiale di gioco per ogni giocatore + date ufficiali
+    fixture = boFixtureForPlayer(me, others, CFG.fixture || []);
+  } else {
+    // Altri gruppi: conserva l'ordine esistente e applica le date ufficiali del Beniopen
+    const kept = (CFG.fixture || []).filter(f=>others.includes(f.opp)).map(f=>({opp:f.opp, from:f.from||'', to:f.to||''}));
+    const used = new Set(kept.map(f=>f.opp));
+    const allFixed = kept.concat(others.filter(n=>!used.has(n)).map(n=>({opp:n, from:'', to:''})));
+    fixture = allFixed.map((f, i) => {
+      const dates = BO_JORNADAS_DATES[i] || {from:'', to:''};
+      return {opp: f.opp, from: f.from || dates.from, to: f.to || dates.to};
+    });
+  }
 
   // org: default Beniopen si el usuario no tenía datos propios ya configurados
   const orgPhone = (CFG.org && CFG.org.phone) || '34637207632';
