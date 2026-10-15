@@ -43,6 +43,126 @@
 </head>
 <body class="booting">
 
+<!-- PWA Install Prompt Overlay para Móviles -->
+<div id="pwa-install-overlay" style="display:none; position:fixed; inset:0; z-index:999999; background:rgba(10,30,26,0.85); backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); align-items:center; justify-content:center; padding:20px; box-sizing:border-box;">
+  <div style="background:#ffffff; color:#14211d; border-radius:24px; max-width:400px; width:100%; padding:26px 22px 22px; text-align:center; box-shadow:0 12px 40px rgba(0,0,0,0.35); position:relative; animation:pwaPop .3s ease-out;">
+    <button type="button" onclick="closePwaPrompt()" style="position:absolute; top:14px; right:14px; background:#f0f4f2; border:none; border-radius:50%; width:32px; height:32px; font-size:16px; font-weight:700; color:#586661; cursor:pointer; display:flex; align-items:center; justify-content:center;">✕</button>
+    <div style="width:72px; height:72px; margin:0 auto 14px; background:linear-gradient(135deg, #0f5a4d, #1c8554); border-radius:18px; display:flex; align-items:center; justify-content:center; box-shadow:0 6px 16px rgba(15,90,77,0.25);">
+      <img src="icon-192.png" alt="Mi Liguilla" style="width:58px; height:58px; border-radius:14px;" onerror="this.outerHTML='<span style=\'font-size:36px;\'>🎾</span>'">
+    </div>
+    <h2 style="font-size:21px; margin:0 0 8px; color:#0f5a4d; font-weight:800;">¡Instala Mi Liguilla!</h2>
+    <p style="font-size:14px; color:#586661; line-height:1.45; margin:0 0 18px;">
+      Instala la app en tu móvil para una experiencia <b>rápida</b>, a pantalla completa y con acceso directo desde tu escritorio.
+    </p>
+
+    <!-- Caja para Android con prompt nativo -->
+    <div id="pwa-android-box" style="display:none; margin-bottom:14px;">
+      <button id="pwa-install-btn" type="button" style="width:100%; background:#0f5a4d; color:#ffffff; border:none; border-radius:14px; padding:14px 18px; font-size:16px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; box-shadow:0 4px 14px rgba(15,90,77,0.35);">
+        📲 Instalar en mi teléfono
+      </button>
+    </div>
+
+    <!-- Caja para iOS (Safari) -->
+    <div id="pwa-ios-box" style="display:none; background:#f4f8f6; border-radius:16px; padding:14px; margin-bottom:14px; text-align:left; font-size:13.5px; color:#14211d; border:1px solid #d9e2de;">
+      <div style="font-weight:700; color:#0f5a4d; margin-bottom:6px; display:flex; align-items:center; gap:6px;">
+        🍏 Añadir a la pantalla de inicio:
+      </div>
+      <div style="margin-bottom:6px; display:flex; align-items:center; gap:8px;">
+        <span style="font-size:18px; line-height:1;">1️⃣</span>
+        <span>Pulsa el botón <b>Compartir</b> <span style="display:inline-block; font-size:16px; vertical-align:middle; background:#fff; padding:2px 6px; border-radius:6px; border:1px solid #ccd;">⎋</span> (abajo en Safari).</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:8px;">
+        <span style="font-size:18px; line-height:1;">2️⃣</span>
+        <span>Baja y selecciona <b>«Añadir a pantalla de inicio» ➕</b>.</span>
+      </div>
+    </div>
+
+    <!-- Botón secundario: continuar en el navegador -->
+    <button type="button" onclick="closePwaPrompt()" style="width:100%; background:transparent; color:#586661; border:1px solid #d9e2de; border-radius:14px; padding:12px; font-size:14px; font-weight:600; cursor:pointer; transition:all .2s ease;">
+      🌐 Continuar en el navegador
+    </button>
+  </div>
+</div>
+
+<style>
+@keyframes pwaPop {
+  0% { transform: scale(0.92); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+</style>
+
+<script>
+(function(){
+  var deferredInstallPrompt = null;
+  var isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+  var isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && window.innerWidth <= 768);
+  var isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+  var dismissed = false;
+  try { dismissed = sessionStorage.getItem('pwa_prompt_dismissed') === '1'; } catch(e){}
+
+  window.addEventListener('beforeinstallprompt', function(e){
+    e.preventDefault();
+    deferredInstallPrompt = e;
+    if(isMobile && !isStandalone && !dismissed){
+      showPrompt(true);
+    }
+  });
+
+  window.closePwaPrompt = function(){
+    var overlay = document.getElementById('pwa-install-overlay');
+    if(overlay) overlay.style.display = 'none';
+    try { sessionStorage.setItem('pwa_prompt_dismissed', '1'); } catch(e){}
+  };
+
+  function showPrompt(isAndroidPromptReady){
+    var overlay = document.getElementById('pwa-install-overlay');
+    if(!overlay) return;
+    overlay.style.display = 'flex';
+    var androidBox = document.getElementById('pwa-android-box');
+    var iosBox = document.getElementById('pwa-ios-box');
+    var btn = document.getElementById('pwa-install-btn');
+
+    if(isIOS){
+      if(iosBox) iosBox.style.display = 'block';
+      if(androidBox) androidBox.style.display = 'none';
+    } else {
+      if(androidBox) androidBox.style.display = 'block';
+      if(iosBox) iosBox.style.display = 'none';
+      if(btn){
+        btn.onclick = function(){
+          if(deferredInstallPrompt){
+            deferredInstallPrompt.prompt();
+            deferredInstallPrompt.userChoice.then(function(choiceResult){
+              if(choiceResult.outcome === 'accepted'){
+                window.closePwaPrompt();
+              }
+              deferredInstallPrompt = null;
+            });
+          } else {
+            alert('Abre el menú de tu navegador (los 3 puntos ⋮ arriba a la derecha) y pulsa "Instalar aplicación" o "Añadir a la pantalla de inicio".');
+            window.closePwaPrompt();
+          }
+        };
+      }
+    }
+  }
+
+  // Si es móvil y no está instalada ni descartada, mostrar prompt
+  window.addEventListener('DOMContentLoaded', function(){
+    if(isMobile && !isStandalone && !dismissed){
+      setTimeout(function(){
+        // Mostramos el overlay de inmediato
+        showPrompt(!!deferredInstallPrompt);
+      }, 500);
+    }
+  });
+
+  window.addEventListener('appinstalled', function(){
+    window.closePwaPrompt();
+  });
+})();
+</script>
+
 <div class="sync-indicator" id="sync-indicator">Sincronizando…</div>
 
 <!-- Botón de donación: visible en todas las pantallas -->
